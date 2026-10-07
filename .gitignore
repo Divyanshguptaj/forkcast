@@ -1,0 +1,14 @@
+.env*
+!.env.example
+node_modules/
+.next/
+
+scripts/phase0/out/
+scripts/phase0/node_modules/
+*.tsbuildinfo
+next-env.d.ts
+/coverage
+.vercel
+*.pem
+npm-debug.log*
+fixtures/places/

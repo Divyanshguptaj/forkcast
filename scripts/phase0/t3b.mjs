@@ -1,0 +1,11 @@
+import { fetchRaw, tavily } from './lib.mjs';
+import { parsePage, dishLines } from './inspector.mjs';
+let r = await fetchRaw('https://www.restaurantcalboter.com/carta-de-menjars.html');
+let p = parsePage(r.buf.toString('utf8'), r.finalUrl);
+console.log('CAL BOTER carta:\n', p.text.slice(300, 1100));
+const a = await tavily('extract', { urls: ['https://anticpitarra.cat/'], include_images: true });
+const x = a.body.results[0]; console.log('\nANTIC PITARRA text:', x.raw_content.slice(0, 500).replace(/\s+/g, ' ')); console.log((x.images || []).slice(0, 19).map(u => u.slice(0, 110)).join('\n'));
+const q = await tavily('extract', { urls: ['https://carta.avocaty.io/paellabar/7YYVGarIxQ5r0GHk6G2c'] });
+console.log('\nAVOCATY via Tavily:', q.body.results?.[0] ? q.body.results[0].raw_content.length + ' chars: ' + q.body.results[0].raw_content.slice(0, 500).replace(/\s+/g, ' ') : JSON.stringify(q.body.failed_results));
+r = await fetchRaw('https://carta.avocaty.io/paellabar/7YYVGarIxQ5r0GHk6G2c'); p = parsePage(r.buf?.toString('utf8') || '', r.finalUrl || '');
+console.log('AVOCATY direct:', r.status, 'chars', p.text.length, 'scripts', p.scripts);
