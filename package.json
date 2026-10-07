@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "phase2": "node --env-file=.env.local --import tsx src/dev/phase2.ts"
   },
   "dependencies": {
     "next": "16.4.0",
