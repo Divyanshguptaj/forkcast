@@ -1,0 +1,8 @@
+.env*
+out
+test-results
+playwright-report
+docs/screenshots
+fixtures
+tests
+scripts

@@ -13,6 +13,7 @@ export type GeminiErrorCode =
   | "missing_api_key"
   | "unavailable"
   | "quota_exhausted"
+  | "budget_exhausted"
   | "bad_request"
   | "timeout"
   | "aborted"

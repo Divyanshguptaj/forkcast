@@ -31,7 +31,7 @@ export function stageViews(state: RunState): StageView[] {
   const counts = researchCounts(state);
   const lastTool = state.tools.at(-1);
 
-  return [
+  const views: StageView[] = [
     {
       id: "understand",
       emoji: "🧠",
@@ -78,4 +78,6 @@ export function stageViews(state: RunState): StageView[] {
       title: s.ready === "done" ? "Recommendations ready" : "Preparing recommendations",
     },
   ];
+  if (state.status !== "error") return views;
+  return views.map((v) => (s[v.id] === "active" ? { ...v, title: "Search stopped", detail: undefined } : v));
 }

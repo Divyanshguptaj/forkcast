@@ -16,6 +16,8 @@ export const RUN_LIMITS = {
   finalRecommendations: 3,
   geminiCallsExpected: 15,
   geminiCallsCeiling: 45,
+  geminiCallsPerSearch: 16,
+  tavilyCallsPerSearch: 12,
   tavilyCreditsPerRun: 40,
   geminiConcurrency: 3,
   researchConcurrency: 5,

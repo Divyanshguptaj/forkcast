@@ -101,6 +101,8 @@ export function createRecommendHandler(deps: HandlerDeps) {
           ? "A search is already running. Wait for it to finish or cancel it first."
           : admission.reason === "busy"
             ? "Forkcast is busy right now. Please try again in a moment."
+            : admission.reason === "capacity"
+              ? "This demo has reached its search limit for now. Please try again later."
             : "You have searched a lot recently. Please wait a little before searching again.";
       return json(429, admission.reason, message, { retryAfterSec: admission.retryAfterSec }, { "retry-after": String(admission.retryAfterSec) });
     }

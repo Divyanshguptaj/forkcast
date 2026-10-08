@@ -25,7 +25,7 @@ let handler: ReturnType<typeof createRecommendHandler> | undefined;
 function getHandler() {
   if (!handler) {
     const env = getEnv();
-    const limiter = new RateLimiter({ maxRequests: env.RATE_LIMIT_MAX_REQUESTS, windowMs: env.RATE_LIMIT_WINDOW_SEC * 1000, maxConcurrentTotal: env.MAX_CONCURRENT_RUNS });
+    const limiter = new RateLimiter({ maxRequests: env.RATE_LIMIT_MAX_REQUESTS, windowMs: env.RATE_LIMIT_WINDOW_SEC * 1000, maxConcurrentTotal: env.MAX_CONCURRENT_RUNS, globalMaxRequests: env.GLOBAL_MAX_SEARCHES_PER_DAY });
     handler = createRecommendHandler({ env: getEnv, providers, limiter, modelCache: sharedExtractionCache });
   }
   return handler;

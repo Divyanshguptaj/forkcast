@@ -160,8 +160,11 @@ export function assertConsistent(request: UserRequest): void {
 export interface NlDeps {
   llm?: LlmProvider;
   signal?: AbortSignal;
+  timeoutMs?: number;
   onLlmCall?(info: { model: string; inputTokens?: number; outputTokens?: number; durationMs: number }): void;
 }
+
+const UNDERSTAND_TIMEOUT_MS = 6_000;
 
 export class HybridUnderstander implements RequestUnderstander {
   constructor(private readonly deps: NlDeps = {}) {}
@@ -172,6 +175,9 @@ export class HybridUnderstander implements RequestUnderstander {
     let parsed: ParsedIntent = text ? heuristicParse(text) : {};
 
     if (text && this.deps.llm && this.deps.llm.available?.() !== false) {
+      const ms = this.deps.timeoutMs ?? UNDERSTAND_TIMEOUT_MS;
+      const limit = AbortSignal.timeout(ms);
+      const signal = this.deps.signal ? AbortSignal.any([this.deps.signal, limit]) : limit;
       try {
         const out = await this.deps.llm.generateStructured(
           {
@@ -181,9 +187,9 @@ export class HybridUnderstander implements RequestUnderstander {
             schema: ModelIntentSchema,
             jsonSchema: MODEL_JSON_SCHEMA as unknown as Record<string, unknown>,
             maxOutputTokens: 600,
-            timeoutMs: 15_000,
+            timeoutMs: ms,
           },
-          { signal: this.deps.signal },
+          { signal },
         );
         this.deps.onLlmCall?.({ model: out.model, inputTokens: out.inputTokens, outputTokens: out.outputTokens, durationMs: out.durationMs });
         const m = out.data;

@@ -28,7 +28,7 @@ export function restaurantPhase(r: RestaurantResearch): RestaurantPhase {
 export type RunNoticeKind = "no_results" | "places_unavailable" | "agent_timeout" | "partial_results" | "unexpected_error" | "request_problem" | "rate_limited" | "service_unavailable";
 
 const REQUEST_CODES = new Set(["invalid_request", "invalid_json", "conflicting_request", "unsupported_city", "payload_too_large", "unsupported_media_type"]);
-const RATE_CODES = new Set(["rate_limited", "already_running", "busy"]);
+const RATE_CODES = new Set(["rate_limited", "already_running", "busy", "capacity"]);
 const SERVICE_CODES = new Set(["not_configured", "network", "incomplete"]);
 
 export function errorKind(code: string): "places_unavailable" | "timeout" | "request_problem" | "rate_limited" | "service_unavailable" | "unknown" {

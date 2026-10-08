@@ -89,6 +89,7 @@ export function ForkcastApp() {
                 live={!replay}
                 pending={!replay && state.status === "idle"}
                 resultsFirst={Boolean(state.recommendations)}
+                typedText={composer?.text}
                 onEdit={edit}
                 onCancel={edit}
                 onRetry={() => begin(lastBody.current, scenarioId, speed)}

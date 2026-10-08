@@ -15,11 +15,14 @@ import type { Fetcher, LlmProvider, PlacesProvider, WebSearchProvider } from "..
 import { recommend, type RecommendCandidate } from "../ranking";
 import type { EventEmitter } from "./events";
 import { estimateCost, type CostEstimate } from "./cost";
+import { RunBudget, budgetedLlm, budgetedSearch } from "./budget";
 import { describeFailure } from "./failure";
 
 export interface RunLimits {
   softDeadlineMs: number;
   hardDeadlineMs: number;
+  maxLlmCalls: number;
+  maxTavilyCalls: number;
   restaurantConcurrency: number;
   fetchConcurrency: number;
   tavilyConcurrency: number;
@@ -28,6 +31,8 @@ export interface RunLimits {
 export const DEFAULT_RUN_LIMITS: RunLimits = {
   softDeadlineMs: Math.round(RUN_LIMITS.globalDeadlineMs * 0.8),
   hardDeadlineMs: RUN_LIMITS.globalDeadlineMs,
+  maxLlmCalls: RUN_LIMITS.geminiCallsPerSearch,
+  maxTavilyCalls: RUN_LIMITS.tavilyCallsPerSearch,
   restaurantConcurrency: 5,
   fetchConcurrency: 6,
   tavilyConcurrency: 2,
@@ -80,6 +85,10 @@ export async function runRecommendation(body: RecommendRequestBodyType, deps: Ru
     },
   };
 
+  const budget = new RunBudget(limits.maxLlmCalls, limits.maxTavilyCalls);
+  const llm = deps.llm ? budgetedLlm(deps.llm, budget) : undefined;
+  const search = deps.search ? budgetedSearch(deps.search, budget) : undefined;
+
   const work = new AbortController();
   const onClientAbort = () => work.abort();
   deps.signal.addEventListener("abort", onClientAbort, { once: true });
@@ -89,7 +98,7 @@ export async function runRecommendation(body: RecommendRequestBodyType, deps: Ru
   let understandRequests = 0;
   let understandTokens = { input: 0, output: 0 };
   const understander = new HybridUnderstander({
-    llm: deps.llm,
+    llm,
     signal: work.signal,
     onLlmCall: (info) => {
       understandRequests++;
@@ -145,13 +154,13 @@ export async function runRecommendation(body: RecommendRequestBodyType, deps: Ru
     const research = Promise.all(
       restaurants.map(async (r) => {
         try {
-          const resolution = await restaurantLimiter.run(() => resolveMenu(r, { fetcher: deps.fetcher, search: deps.search, emitter: tracked, sharedCache, limiters, signal: work.signal }));
+          const resolution = await restaurantLimiter.run(() => resolveMenu(r, { fetcher: deps.fetcher, search, emitter: tracked, sharedCache, limiters, signal: work.signal }));
           resolutions.set(r.placeId, resolution);
           const { results, stats } = await extractMenus([{ restaurant: r, resolution }], {
             fetcher: deps.fetcher,
             sharedCache,
             modelCache,
-            llm: deps.llm,
+            llm,
             priceCheckModel: deps.env.GEMINI_PRICE_CHECK_MODEL,
             emitter: tracked,
             signal: work.signal,
@@ -184,7 +193,9 @@ export async function runRecommendation(body: RecommendRequestBodyType, deps: Ru
 
     const sum = (pick: (s: ExtractionRunStats) => number) => extractStats.reduce((n, s) => n + pick(s), 0);
     const quotaSkipped = sum((s) => s.quotaSkipped);
-    if (quotaSkipped > 0 || deps.llm?.available?.() === false) set.notices.push("The AI reader has reached its daily limit, so some menus were read with a basic parser. Dietary details are limited and fewer dishes can be confirmed.");
+    if (deps.llm?.available?.() === false || (quotaSkipped > 0 && !budget.llmExhausted)) set.notices.push("The AI reader has reached its daily limit, so some menus were read with a basic parser. Dietary details are limited and fewer dishes can be confirmed.");
+    if (budget.llmExhausted) set.notices.push("This search reached its AI-call limit, so some menus were read with a basic parser and dietary details are limited.");
+    if (budget.tavilyExhausted) set.notices.push("This search reached its web-search limit, so a few menus may not have been found.");
     if (!deps.llm) set.notices.push("AI menu reading is not configured, so menus were read with a basic parser and dietary details are limited.");
     if (partial) set.notices.push("The time limit was reached, so some restaurants were not fully researched.");
     if (discovery.normalized.warnings.length > 0) set.notices.push(...discovery.normalized.warnings.map((w) => w.slice(0, 300)));

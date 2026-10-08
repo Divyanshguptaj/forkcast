@@ -105,6 +105,14 @@ describe("hybrid understanding", () => {
     expect(req).toMatchObject({ diet: ["vegetarian"], meal: "brunch", budget: { max: 25 } });
   });
 
+  it("gives up on a slow or failing model quickly and uses the built-in parser", async () => {
+    const hanging = { available: () => true, generateStructured: (_req: unknown, ctx?: { signal?: AbortSignal }) => new Promise<never>((_resolve, reject) => ctx?.signal?.addEventListener("abort", () => reject(new Error("aborted")))) };
+    const started = Date.now();
+    const req = await new HybridUnderstander({ llm: hanging as never, timeoutMs: 60 }).understand({ text: "vegan lunch under €15" });
+    expect(Date.now() - started).toBeLessThan(1_500);
+    expect(req).toMatchObject({ diet: ["vegan"], meal: "lunch", budget: { max: 15 } });
+  });
+
   it("rejects contradictions and unsupported cities with specific errors", async () => {
     await expect(new HybridUnderstander().understand({ text: "vegan dinner in Madrid" })).rejects.toBeInstanceOf(UnsupportedCityError);
     const llm = fakeLlm(() => ({ ...intent, diet: ["vegan"], mustHave: ["a steak"] }));

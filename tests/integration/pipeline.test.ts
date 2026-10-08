@@ -243,6 +243,43 @@ describe("provider failures", () => {
   });
 });
 
+describe("per-search provider budgets", () => {
+  it("stops spending AI calls at the limit, falls back to the basic parser and says so", async () => {
+    const llm = llmFor();
+    const h = harness({ llm, limits: { maxLlmCalls: 2 } });
+    const out = await runRecommendation(body("vegetarian dinner under €30"), h.deps);
+    expect(out.outcome).toBe("completed");
+    expect(llm.calls.length).toBeLessThanOrEqual(2);
+    const set = result(h.events)!;
+    expect(set.notices.join(" ")).toContain("AI-call limit");
+    expect(set.notices.join(" ")).not.toContain("daily limit");
+    expect(set.recommendations.length + set.excluded.length).toBe(3);
+  });
+
+  it("caps web searches per run and keeps researching with what is already known", async () => {
+    const table: Record<string, string> = {};
+    for (const s of SITES) table[`https://${s.host}/`] = html("<p>Bienvenidos</p>");
+    const calls: string[] = [];
+    const search = {
+      async search(query: string) { calls.push(query); return []; },
+      async extract() { calls.push("extract"); return { pages: [], failed: [] }; },
+    };
+    const h = harness({ search, limits: { maxTavilyCalls: 2 } }, table);
+    const out = await runRecommendation(body("vegetarian dinner"), h.deps);
+    expect(out.outcome).toBe("completed");
+    expect(calls.length).toBeLessThanOrEqual(2);
+    expect(result(h.events)!.notices.join(" ")).toContain("web-search limit");
+  });
+
+  it("uses the documented default ceilings", async () => {
+    const { RUN_LIMITS } = await import("@/config/limits");
+    const { DEFAULT_RUN_LIMITS } = await import("@/server/agent/run");
+    expect(DEFAULT_RUN_LIMITS.maxLlmCalls).toBe(RUN_LIMITS.geminiCallsPerSearch);
+    expect(DEFAULT_RUN_LIMITS.maxLlmCalls).toBeLessThanOrEqual(RUN_LIMITS.geminiCallsExpected + 1);
+    expect(DEFAULT_RUN_LIMITS.maxTavilyCalls).toBeLessThanOrEqual(12);
+  });
+});
+
 describe("a provider that never answers", () => {
   it("is cut off at the hard deadline and the other results are still delivered", async () => {
     const stuck = routes();

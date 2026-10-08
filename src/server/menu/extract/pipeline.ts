@@ -164,7 +164,7 @@ export function selectDocuments(inputs: ExtractInput[], limits: Pick<ExtractLimi
 }
 
 function failureReason(err: unknown): string {
-  if (err instanceof GeminiError) return err.code === "quota_exhausted" ? "model daily quota exhausted" : `model ${err.code}`;
+  if (err instanceof GeminiError) return err.code === "quota_exhausted" ? "model daily quota exhausted" : err.code === "budget_exhausted" ? "AI call limit for this search reached" : `model ${err.code}`;
   return "model error";
 }
 

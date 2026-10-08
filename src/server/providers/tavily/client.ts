@@ -6,7 +6,7 @@ const BASE_URL = "https://api.tavily.com";
 const MAX_QUERY_CHARS = 300;
 const MAX_URLS_PER_EXTRACT = 5;
 
-export type TavilyErrorCode = "missing_api_key" | "bad_request" | "auth" | "rate_limited" | "server" | "timeout" | "aborted" | "network" | "invalid_response";
+export type TavilyErrorCode = "missing_api_key" | "bad_request" | "auth" | "rate_limited" | "server" | "timeout" | "aborted" | "network" | "invalid_response" | "budget_exhausted";
 
 export class TavilyError extends Error {
   constructor(

@@ -2,7 +2,9 @@
 
 Forkcast is an AI-assisted restaurant finder for travellers. You describe a meal in a sentence ("vegetarian Italian dinner under €30 in Barcelona"); Forkcast finds real restaurants, reads their actual menus, and recommends the ones that truly fit, showing the dishes, the prices, the evidence, and what it could **not** confirm.
 
-The design rule is that facts are never invented. Every dish, price and dietary reading is traced to a menu document, uncertain readings are labelled as uncertain, and the ranking is deterministic code, not a language model. Barcelona is the only supported city.
+## The problem it solves
+
+Travellers with dietary needs or a budget cannot trust a restaurant's star rating or category: a "vegetarian-friendly" Italian place may offer one salad, and the menu is often a PDF in Catalan or Spanish. Forkcast answers the real question, "what can I actually eat here, and what will it cost?", by reading the menus themselves, translating them, and judging them dish by dish. The design rule is that facts are never invented: every dish, price and dietary reading is traced to a menu document, uncertain readings are labelled as uncertain, and the ranking is deterministic code, not a language model. Barcelona is the only supported city.
 
 ![Results on desktop](docs/screenshots/recommendation-card-desktop.png)
 
@@ -41,7 +43,25 @@ flowchart LR
 | Ranking and explanations | `src/server/ranking` |
 | Providers (Places, Tavily, Gemini, safe fetch) | `src/server/providers` |
 
-Phase documents with the reasoning behind each layer are in `docs/` (`phase0-findings`, `phase2-discovery`, `phase3-ui`, `phase4-menu-resolver`, `phase5-menu-extraction`, `phase6-recommendations`, `phase7-integration`, `phase8-final-qa`).
+Phase documents with the reasoning behind each layer are in `docs/` (`phase0-findings`, `phase2-discovery`, `phase3-ui`, `phase4-menu-resolver`, `phase5-menu-extraction`, `phase6-recommendations`, `phase7-integration`, `phase8-final-qa`, `phase9-predeployment-audit`, `deployment`, `git-history-cleanup`).
+
+## How it works
+
+**Agent workflow.** One search is a pipeline of small, bounded steps that the browser watches as a stream of events:
+
+1. **Understand**: the sentence and the filter chips become structured constraints (diet, meal, cuisine, budget, allergies, avoided foods, preferences). Gemini reads the sentence; a built-in parser is the fallback when Gemini is slow or unavailable. Contradictions ("vegan" plus "steak") and unsupported cities are rejected with an explanation.
+2. **Discover**: Google Places text searches find candidate restaurants; closed, out-of-area and not-open-for-the-meal places are filtered out and a deterministic shortlist of five is chosen (rating shrunk by review count, distance, search relevance).
+3. **Resolve the menu** for each restaurant in parallel: the official website first (links, sitemap, PDFs, images), then Tavily web searches for the restaurant's menu (files on the official domain are trusted more than others), then lower-trust sources. Every candidate document gets a source tier (official site, linked from the official site, on the official domain, unverified file, third-party), an identity check (does it name this restaurant and address?), and a document kind (food menu, drinks, set menu, legal page).
+4. **Read the dishes**: text and PDF menus are read as text; scanned PDFs and photos are read by Gemini vision. The model returns structured dishes with the original wording, an English translation, section, price as printed, and a dietary reading.
+5. **Rank** with deterministic code (no AI) and explain.
+
+**Real data and provenance.** Restaurants, ratings, hours and maps links come from Google Places. Menus come from the restaurants' own websites or documents found by search. Each recommendation carries the document it came from (tier, link, page), the quoted menu label or ingredient list behind a dietary reading, and how its score was built.
+
+**Menu reading and translation.** Dish names and descriptions are kept exactly as printed and translated separately; a dish name that does not appear in the source text is dropped as a hallucination; prices are re-parsed deterministically (decimal commas, variants, set menus) and must appear next to the dish; photographed prices are read twice and a disagreement is marked "disputed" and never used for a budget.
+
+**Scoring.** Hard constraints (diet, budget, must-haves) are checked per dish first. A restaurant is *exact* only if a main course is confirmed vegetarian/vegan/etc. by a menu label or ingredient list **and** has a verified price within budget. Otherwise it is *partial* (a preference is contradicted), *needs checking* (plausible but unconfirmed) or a *near miss* (over budget, with the overage shown). Within a tier, a documented weighted score orders restaurants: matching dishes (saturating at three, so large menus do not win by size), strength of dietary evidence, budget, cuisine, meal, source reliability and discovery relevance. See `docs/phase6-recommendations.md`.
+
+**Accuracy safeguards.** Unknown is never treated as a match; meat or fish words override a model's "vegetarian"; a model claim needs a quote that really appears in the source; vegan needs a vegan label or ingredient list; gluten-free needs a label; halal, kosher and allergens are never confirmed (every card carries an allergy warning); menu files whose address shows an older year are flagged as possibly outdated; group-menu prices are never shown as individual prices; drinks are never recommended as dishes. `npm run audit` re-checks live results against the source documents.
 
 ## Tech stack
 
@@ -64,7 +84,7 @@ npm run dev                     # http://localhost:3000
 | `TAVILY_API_KEY` | recommended | menu search when a restaurant's own site has no readable menu. |
 | `GEMINI_MODEL_CHAIN` | no | comma-separated models tried in order, quota-aware. |
 | `GEMINI_PRICE_CHECK_MODEL` | no | cheaper model for the second read of photographed prices. |
-| `RATE_LIMIT_MAX_REQUESTS`, `RATE_LIMIT_WINDOW_SEC`, `MAX_CONCURRENT_RUNS` | no | per-client limit (default 6 per 10 minutes, one search at a time) and global concurrent searches (default 4). |
+| `RATE_LIMIT_MAX_REQUESTS`, `RATE_LIMIT_WINDOW_SEC`, `MAX_CONCURRENT_RUNS`, `GLOBAL_MAX_SEARCHES_PER_DAY` | no | per-client limit (default 6 per 10 minutes, one search at a time), global concurrent searches (default 4) and a per-instance daily search ceiling (default 100). |
 | `TRUST_PROXY_HEADERS` | no | `true` (default) reads the client IP from `x-forwarded-for`; set `false` if there is no proxy. |
 | `PLACES_REVIEWS_TO_LLM` | no | keep `false`. |
 
@@ -96,7 +116,7 @@ npm run build
 npm start
 ```
 
-`GET /api/health` reports which keys are configured (never their values). A search streams for up to about 60 seconds, so the host must allow long streaming responses; the route declares `maxDuration = 120`. Vercel's Fluid compute allows 300 s on the Hobby plan and 800 s on Pro ([limits](https://vercel.com/docs/functions/limitations)); any long-lived Node host (Railway, Fly, Render, a VM) also works. The rate limiter and caches are in process memory, so they apply per instance. A deployment checklist is in `docs/phase7-integration.md`.
+`GET /api/health` reports which keys are configured (never their values). A search streams for up to about 60 seconds, so the host must allow long streaming responses; the route declares `maxDuration = 120`. Vercel's Fluid compute allows 300 s on the Hobby plan and 800 s on Pro ([limits](https://vercel.com/docs/functions/limitations)); any long-lived Node host (Railway, Fly, Render, a VM) also works. The rate limiter and caches are in process memory, so they apply per instance. The deployment guide, cost safeguards and manual steps are in `docs/deployment.md`.
 
 ## Demo flow (about 3 minutes)
 

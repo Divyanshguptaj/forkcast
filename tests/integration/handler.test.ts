@@ -139,6 +139,18 @@ describe("limits and concurrency", () => {
     expect(limiter.activeRuns).toBe(0);
   });
 
+  it("stops accepting searches from anyone once the global ceiling is reached", async () => {
+    const limiter = new RateLimiter({ globalMaxRequests: 2, maxRequests: 50 });
+    const { handler } = setup(okRun, { limiter });
+    for (const ip of ["1.1.1.1", "2.2.2.2"]) await (await handler(post({ text: "vegan dinner" }, { headers: { "x-forwarded-for": ip } }))).text();
+    const blocked = await handler(post({ text: "vegan dinner" }, { headers: { "x-forwarded-for": "3.3.3.3" } }));
+    expect(blocked.status).toBe(429);
+    const body = await blocked.json();
+    expect(body.error.code).toBe("capacity");
+    expect(body.error.message).toContain("search limit");
+    expect(Number(blocked.headers.get("retry-after"))).toBeGreaterThanOrEqual(60);
+  });
+
   it("applies a per-client rate limit", async () => {
     const limiter = new RateLimiter({ maxRequests: 2, windowMs: 60_000 });
     const { handler } = setup(okRun, { limiter });

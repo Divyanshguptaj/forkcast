@@ -18,13 +18,14 @@ interface Props {
   live?: boolean;
   pending?: boolean;
   resultsFirst?: boolean;
+  typedText?: string;
   onEdit?(): void;
   onRetry?(): void;
   onCancel?(): void;
   children?: ReactNode;
 }
 
-export function AgentResearchView({ state, mockedStages = false, live = false, pending = false, resultsFirst = false, onEdit, onRetry, onCancel, children }: Props) {
+export function AgentResearchView({ state, mockedStages = false, live = false, pending = false, resultsFirst = false, typedText, onEdit, onRetry, onCancel, children }: Props) {
   const notice = runNotice(state);
   const views = stageViews(state);
   const active = views.find((v) => state.stages[v.id] === "active");
@@ -43,6 +44,7 @@ export function AgentResearchView({ state, mockedStages = false, live = false, p
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border-2 border-line bg-surface px-4 py-3">
         <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
           <span aria-hidden="true">🔎</span>
+          {requestSummaryParts(state.request).length === 0 && typedText ? <span className="min-w-0 truncate text-ink">“{typedText.slice(0, 90)}”</span> : null}
           {requestSummaryParts(state.request).map((part, i) => (
             <span key={`${part}-${i}`} className="rounded-full border border-line px-2.5 py-0.5 text-ink">
               {part}
