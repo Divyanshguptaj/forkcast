@@ -9,6 +9,7 @@ import {
   CandidateTable,
   TIER_RANK,
   markAlternates,
+  markVenueVariants,
   computeConfidence,
   guessMediaType,
   hostKindOf,
@@ -20,7 +21,7 @@ import {
 import { classifyCandidate, isFoodLike } from "./classify";
 import { ResolverFetcher } from "./fetcher";
 import { analyzeHtml, contentFactsFromText, parseSitemapUrls, type PageAnalysis, type PageLink } from "./htmlInspector";
-import { IDENTITY_ACCEPT, IDENTITY_REJECT, assessIdentity, type RestaurantIdentity } from "./identity";
+import { IDENTITY_ACCEPT, IDENTITY_REJECT, assessIdentity, nameTokens, type RestaurantIdentity } from "./identity";
 import { MENU_TERMS, SET_MENU_TERMS, DESSERT_TERMS, DRINKS_TERMS, URL_STEMS, urlHasStem } from "./lexicon";
 import { createLimiter, type Limiter } from "./limiter";
 import { samplePdf } from "./pdfProbe";
@@ -53,6 +54,15 @@ export interface ResolverDeps {
 }
 
 const LANGUAGE_LABEL = /^(castellano|espanol|español|spanish|english|ingles|inglés|catala|català|catalan|catalán|french|frances|français|deutsch|german|italiano)$/i;
+function urlPath(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.pathname}${u.search}`;
+  } catch {
+    return url;
+  }
+}
+
 const LANDING_THRESHOLD = 0.4;
 const MENU_FLOOR = 0.55;
 const SEARCH_RESULTS = 8;
@@ -147,7 +157,7 @@ class ResolverRun {
       SET_MENU_TERMS.test(label) ||
       DRINKS_TERMS.test(label) ||
       DESSERT_TERMS.test(label) ||
-      urlHasStem(link.url, [...URL_STEMS.food, ...URL_STEMS.drinks, ...URL_STEMS.dessert, ...URL_STEMS.set]) ||
+      urlHasStem(urlPath(link.url), [...URL_STEMS.food, ...URL_STEMS.drinks, ...URL_STEMS.dessert, ...URL_STEMS.set]) ||
       media === "pdf" ||
       media === "image" ||
       media === "viewer" ||
@@ -338,8 +348,13 @@ class ResolverRun {
     }
   }
 
-  async probeMany(list: Candidate[]): Promise<void> {
+  markCandidateGroups(): void {
     markAlternates(this.table.all());
+    markVenueVariants(this.table.all(), nameTokens(this.r.name));
+  }
+
+  async probeMany(list: Candidate[]): Promise<void> {
+    this.markCandidateGroups();
     const todo = list
       .filter((c) => !c.probed && !c.rejectedReason && !c.alternateOf && c.kind !== "not_a_menu" && c.likelihood >= 0.2)
       .sort((a, b) => b.likelihood - a.likelihood)
@@ -466,7 +481,7 @@ class ResolverRun {
   }
 
   async followInternalPages(homeUrl: string): Promise<void> {
-    markAlternates(this.table.all());
+    this.markCandidateGroups();
     const pages = this.table
       .all()
       .filter((c) => !c.alternateOf && c.hostKind === "official" && (c.mediaType === "unknown" || c.mediaType === "html") && !c.probed && c.kind !== "not_a_menu" && c.likelihood >= 0.3)
@@ -545,8 +560,8 @@ class ResolverRun {
     }
     const added: Candidate[] = [];
     for (const url of urls) {
-      if (!sameSite(url, homeUrl) || !urlHasStem(url, [...URL_STEMS.food, ...URL_STEMS.set, ...URL_STEMS.dessert])) continue;
-      if (urlHasStem(url, URL_STEMS.legal)) continue;
+      if (!sameSite(url, homeUrl) || !urlHasStem(urlPath(url), [...URL_STEMS.food, ...URL_STEMS.set, ...URL_STEMS.dessert])) continue;
+      if (urlHasStem(urlPath(url), URL_STEMS.legal)) continue;
       const cls = classifyCandidate({ url, anchorText: "", title: "", context: "", mediaType: guessMediaType(url, "official"), viaMenuPage: false, linkedFromOfficial: false });
       const c = this.table.add({
         url,

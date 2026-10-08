@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyAmbiguityDecisions, findAmbiguous } from "@/server/menu/resolver/ambiguity";
 import { ResolverBudget } from "@/server/menu/resolver/budget";
-import { CandidateTable, TIER_BASE, TIER_RANK, computeConfidence, guessMediaType, hostKindOf, isSelectable, markAlternates } from "@/server/menu/resolver/candidateTable";
+import { CandidateTable, TIER_BASE, TIER_RANK, computeConfidence, guessMediaType, hostKindOf, isSelectable, markAlternates, markVenueVariants } from "@/server/menu/resolver/candidateTable";
 import { classifyCandidate, MENU_LIKELIHOOD_THRESHOLD } from "@/server/menu/resolver/classify";
 import { analyzeHtml, contentFactsFromText, parseSitemapUrls } from "@/server/menu/resolver/htmlInspector";
 import { assessIdentity, nameTokens, streetTokens } from "@/server/menu/resolver/identity";
@@ -380,5 +380,42 @@ describe("precision fixes found by the live Phase 0 run", () => {
     const page = html(`<script>var cfg = {"u":"https://static.parastorage.com/services/restaurant-menus-showcase/1.2/app.js","pdf":"https://cdn.example.com/Carta.pdf"}</script><p>See https://evil.example/menu.pdf</p>`);
     const links = analyzeHtml(page, "https://x.com/").links;
     expect(links.map((l) => l.url)).toEqual(["https://cdn.example.com/Carta.pdf"]);
+  });
+});
+
+describe("group sites with several venues", () => {
+  const identity = { confidence: 1, mismatch: false, reasons: [] };
+  const add = (table: CandidateTable, url: string, anchorText = "") =>
+    table.add({ url, via: "site_link", tier: "official_site", hostKind: "official", mediaType: "html", kind: "food_menu", likelihood: 0.6, identity, signals: [], anchorText })!;
+
+  it("keeps only the location that matches the restaurant name and treats the others as other venues", () => {
+    const table = new CandidateTable("r1");
+    const gracia = add(table, "https://group.example/es/carta/?sede=gracia", "Carta");
+    const parlament = add(table, "https://group.example/es/carta/?sede=parlament", "Carta");
+    const mine = add(table, "https://group.example/es/carta/?sede=paellabar", "Carta");
+    const mineGroups = add(table, "https://group.example/es/carta/?sede=paellabar&view=groups", "Carta grupos");
+    markVenueVariants(table.all(), nameTokens("Paella Bar Boqueria"));
+    expect(mine.alternateOf).toBeUndefined();
+    expect(mineGroups.alternateOf).toBeUndefined();
+    expect(gracia.alternateOf).toBe(mine.id);
+    expect(parlament.alternateOf).toBe(mine.id);
+  });
+
+  it("keeps every variant when nothing identifies the venue", () => {
+    const table = new CandidateTable("r1");
+    const a = add(table, "https://group.example/carta/?sede=a");
+    const b = add(table, "https://group.example/carta/?sede=b");
+    markVenueVariants(table.all(), nameTokens("Restaurante Sin Pistas"));
+    expect(a.alternateOf).toBeUndefined();
+    expect(b.alternateOf).toBeUndefined();
+  });
+});
+
+describe("hostnames are not menu evidence", () => {
+  it("does not let 'tapas' in the domain name boost every link on the site", () => {
+    const c = classifyCandidate({ url: "https://tapasypaellabarceloneta.es/URL_INSTAGRAM", anchorText: "", title: "", context: "", mediaType: "unknown", viaMenuPage: false, linkedFromOfficial: false });
+    expect(c.menuLikelihood).toBe(0);
+    const host = classifyCandidate({ url: "https://menu.example.com/venue", anchorText: "", title: "", context: "", mediaType: "external_host", viaMenuPage: false, linkedFromOfficial: false });
+    expect(host.menuLikelihood).toBeGreaterThan(0);
   });
 });

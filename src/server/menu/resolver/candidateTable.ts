@@ -197,6 +197,37 @@ export function hasLanguageMarker(c: Pick<Candidate, "normalized">): boolean {
   return LANG_PREFIX.test(path) || LANG_SUFFIX.test(path);
 }
 
+export function markVenueVariants(list: Candidate[], venueTokens: string[]): void {
+  if (venueTokens.length === 0) return;
+  const groups = new Map<string, Candidate[]>();
+  for (const c of list) {
+    if (c.alternateOf || c.hostKind !== "official") continue;
+    const rest = c.normalized.comparisonKey.slice(c.normalized.host.replace(/^www\./, "").length);
+    const queryAt = rest.indexOf("?");
+    if (queryAt === -1) continue;
+    const key = `${c.normalized.host}${rest.slice(0, queryAt)}`;
+    groups.set(key, [...(groups.get(key) ?? []), c]);
+  }
+  const flat = (text: string) => text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+  for (const group of groups.values()) {
+    const venues = new Set(group.map((c) => c.normalized.comparisonKey.slice(c.normalized.comparisonKey.indexOf("?")).replace(/[&?]view=[^&]*/g, "")));
+    if (venues.size < 2) continue;
+    const matches = group.filter((c) => {
+      const text = flat(`${c.anchorText} ${c.normalized.comparisonKey.slice(c.normalized.comparisonKey.indexOf("?"))}`);
+      return venueTokens.some((t) => text.includes(t));
+    });
+    if (matches.length === 0) continue;
+    const matchedVenues = new Set(matches.map((c) => c.normalized.comparisonKey.slice(c.normalized.comparisonKey.indexOf("?")).replace(/[&?]view=[^&]*/g, "")));
+    for (const c of group) {
+      if (matches.includes(c)) continue;
+      const venue = c.normalized.comparisonKey.slice(c.normalized.comparisonKey.indexOf("?")).replace(/[&?]view=[^&]*/g, "");
+      if (matchedVenues.has(venue)) continue;
+      c.alternateOf = matches[0].id;
+      c.notes.push("menu for a different location of the same group");
+    }
+  }
+}
+
 export function markAlternates(list: Candidate[]): void {
   const groups = new Map<string, Candidate[]>();
   for (const c of list) {

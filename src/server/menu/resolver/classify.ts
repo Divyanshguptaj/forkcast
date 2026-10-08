@@ -29,10 +29,13 @@ export const isFoodLike = (kind: ResolverDocumentKindValue): boolean => FOOD_LIK
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
+const MENU_HOST_LABELS = new Set(["menu", "menus", "carta", "cartas", "qr"]);
+
 function pathOf(url: string): string {
   try {
     const u = new URL(url);
-    return `${u.hostname}${u.pathname}`;
+    const hostLabel = u.hostname.split(".")[0].toLowerCase();
+    return `${MENU_HOST_LABELS.has(hostLabel) ? `/${hostLabel}` : ""}${u.pathname}${u.search}`;
   } catch {
     return url;
   }

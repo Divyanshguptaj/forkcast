@@ -81,3 +81,9 @@ Tavily credits are estimated (search 1, extract 1 per call), not read from the A
 - `menu.bigmammagroup.com`-style JS menu hosts linked by the official site are candidates but often unreadable without a browser.
 - Third-party hosts are only searched, never scraped by custom code.
 - PDF classification samples the first two pages of text; scanned PDFs have no text sample and rely on URL and anchor evidence.
+
+## Live results (2026-10-08)
+
+13 Phase 0 restaurants: 70 direct fetches (avg 5.4), Tavily 5 searches + 1 extract (~6 credits), Gemini 0, 16.5 MB, 37 s wall with 3 restaurants in parallel. Vegan Tulsi: `found_but_unreadable` / `flipbook_viewer` with the official FlipHTML5 URL, 3 fetches, no Tavily. Five-restaurant Phase 2 shortlist: 26 fetches, Tavily 4 searches + 1 extract (~5 credits), Gemini 0, 14 MB, 15 s wall. The Places shortlist is not stable between runs (Google's result order changes), so the five restaurants differ from run to run.
+
+Group sites with several venues: a venue token from the restaurant name is used to keep only the matching `?sede=` variant (Pepa Tomate), and an image or PDF on a shared group domain can still belong to another venue.
