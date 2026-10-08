@@ -48,6 +48,8 @@ export const CandidateSummarySchema = z.object({
   signals: z.array(z.string()).default([]),
   selected: z.boolean(),
   rejectedReason: z.string().max(160).optional(),
+  readVia: z.enum(["direct", "tavily_extract"]).optional(),
+  pageCount: z.number().int().min(1).optional(),
 });
 
 export const StageAttemptSchema = z.object({

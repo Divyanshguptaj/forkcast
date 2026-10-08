@@ -159,6 +159,11 @@ describe("full demo research states", () => {
     expect(phase("demo-atelier")).not.toBe("failed");
   });
 
+  it("records the extraction summary and the number of dishes read", () => {
+    expect(state.restaurants["demo-alba"].menu.extraction).toMatchObject({ status: "extracted", documentCount: 2, dishCount: 4 });
+    expect(state.restaurants["demo-atelier"].menu.extraction).toMatchObject({ status: "partial", skippedCount: 1, reason: "one document could not be read" });
+  });
+
   it("finishes every stage and records review terms", () => {
     expect(Object.values(state.stages).every((s) => s === "done")).toBe(true);
     expect(state.rankDone && state.explainDone).toBe(true);

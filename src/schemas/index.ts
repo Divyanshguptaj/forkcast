@@ -6,3 +6,4 @@ export * from "./reviews";
 export * from "./recommendation";
 export * from "./events";
 export * from "./menuResolution";
+export * from "./menuExtraction";

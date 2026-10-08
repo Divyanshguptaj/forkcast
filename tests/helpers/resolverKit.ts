@@ -116,7 +116,16 @@ export function nav(links: Array<[string, string]>): string {
 }
 
 function pdfString(value: string): string {
-  return value.replace(/[\\()]/g, (c) => `\\${c}`).replace(/[^\x20-\x7e]/g, "?");
+  let out = "";
+  for (const ch of value) {
+    const code = ch === "€" ? 128 : ch.charCodeAt(0);
+    if (ch === "\\" || ch === "(" || ch === ")") out += "\\" + ch;
+    else if (code >= 0x20 && code <= 0x7e) out += ch;
+    else if (code >= 0xa0 && code <= 0xff) out += "\\" + code.toString(8);
+    else if (code === 128) out += "\\200";
+    else out += "?";
+  }
+  return out;
 }
 
 export function makeTextPdf(pages: string[][]): Uint8Array {
@@ -137,7 +146,7 @@ export function makeTextPdf(pages: string[][]): Uint8Array {
   }
   objects.push("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
   objects.push(`2 0 obj\n<< /Type /Pages /Kids [${kids.map((k) => `${k} 0 R`).join(" ")}] /Count ${kids.length} >>\nendobj\n`);
-  objects.push(`${fontId} 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n`);
+  objects.push(`${fontId} 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n`);
   objects.push(...pageObjects);
 
   let out = "%PDF-1.4\n";

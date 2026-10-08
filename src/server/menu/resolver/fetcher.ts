@@ -14,8 +14,17 @@ export interface FetchOutcome {
   fromCache: boolean;
 }
 
+export interface ResolverSharedCache {
+  fetch: Map<string, Promise<FetchOutcome>>;
+  extractedText: Map<string, string>;
+}
+
+export function createSharedCache(): ResolverSharedCache {
+  return { fetch: new Map(), extractedText: new Map() };
+}
+
 export class ResolverFetcher {
-  readonly #cache = new Map<string, Promise<FetchOutcome>>();
+  readonly #cache: Map<string, Promise<FetchOutcome>>;
 
   constructor(
     private readonly fetcher: Fetcher,
@@ -23,7 +32,10 @@ export class ResolverFetcher {
     private readonly limiter: Limiter,
     private readonly signal?: AbortSignal,
     private readonly options: Pick<SafeFetchOptions, "timeoutMs"> = {},
-  ) {}
+    cache?: Map<string, Promise<FetchOutcome>>,
+  ) {
+    this.#cache = cache ?? new Map();
+  }
 
   async get(url: string, kind: { html?: boolean } = {}): Promise<FetchOutcome> {
     const key = normalizeUrl(url)?.comparisonKey ?? url;

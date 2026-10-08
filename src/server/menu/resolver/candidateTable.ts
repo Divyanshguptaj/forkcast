@@ -265,5 +265,7 @@ export function toSummary(c: Candidate): CandidateSummary {
     signals: [...c.signals, ...c.notes].slice(0, 14),
     selected: c.selected,
     rejectedReason: c.rejectedReason,
+    readVia: c.probeVia,
+    pageCount: c.pageCount,
   };
 }

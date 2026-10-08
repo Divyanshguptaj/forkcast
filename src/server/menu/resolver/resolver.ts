@@ -19,7 +19,7 @@ import {
   type Candidate,
 } from "./candidateTable";
 import { classifyCandidate, isFoodLike } from "./classify";
-import { ResolverFetcher } from "./fetcher";
+import { ResolverFetcher, type ResolverSharedCache } from "./fetcher";
 import { analyzeHtml, contentFactsFromText, parseSitemapUrls, type PageAnalysis, type PageLink } from "./htmlInspector";
 import { IDENTITY_ACCEPT, IDENTITY_REJECT, assessIdentity, nameTokens, type RestaurantIdentity } from "./identity";
 import { MENU_TERMS, SET_MENU_TERMS, DESSERT_TERMS, DRINKS_TERMS, URL_STEMS, urlHasStem } from "./lexicon";
@@ -51,6 +51,7 @@ export interface ResolverDeps {
   limiters?: ResolverLimiters;
   signal?: AbortSignal;
   now?: () => number;
+  sharedCache?: ResolverSharedCache;
 }
 
 const LANGUAGE_LABEL = /^(castellano|espanol|español|spanish|english|ingles|inglés|catala|català|catalan|catalán|french|frances|français|deutsch|german|italiano)$/i;
@@ -104,7 +105,7 @@ class ResolverRun {
     this.table = new CandidateTable(r.placeId, this.limits.maxCandidates);
     const fetchLimiter = deps.limiters?.fetch ?? createLimiter(4);
     this.tavilyLimiter = deps.limiters?.tavily ?? createLimiter(2);
-    this.fetcher = new ResolverFetcher(deps.fetcher, this.budget, fetchLimiter, deps.signal, { timeoutMs: this.limits.pageTimeoutMs });
+    this.fetcher = new ResolverFetcher(deps.fetcher, this.budget, fetchLimiter, deps.signal, { timeoutMs: this.limits.pageTimeoutMs }, deps.sharedCache?.fetch);
     this.identity = { name: r.name, address: r.address, city: r.city, websiteUrl: r.websiteUrl };
     this.officialDomain = r.websiteUrl ? normalizeUrl(r.websiteUrl)?.registrableDomain : undefined;
     this.now = deps.now ?? Date.now;
@@ -278,6 +279,7 @@ class ResolverRun {
       if (!menuLike || facts.textChars < 400) return false;
       c.readability = "readable";
       c.unreadableReason = undefined;
+      this.deps.sharedCache?.extractedText.set(c.normalized.comparisonKey, page.text);
       if (c.mediaType === "unknown") c.mediaType = c.hostKind === "menu_host" ? "external_host" : "html";
       this.reassessIdentity(c, page.text);
       this.reclassify(c);

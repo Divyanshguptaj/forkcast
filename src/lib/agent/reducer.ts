@@ -77,7 +77,12 @@ function applyRestaurantEvent(r: RestaurantResearch, event: OrphanEvent): Restau
       return { ...r, menu: { ...r.menu, stages } };
     }
     case "menu.read":
-      return { ...r, menu: { ...r.menu, read: { format: event.format, languages: event.languages, usedVision: event.usedVision } } };
+      return { ...r, menu: { ...r.menu, read: { format: event.format, languages: event.languages, usedVision: event.usedVision, dishCount: event.dishCount } } };
+    case "menu.extracted":
+      return {
+        ...r,
+        menu: { ...r.menu, extraction: { status: event.status, documentCount: event.documentCount, skippedCount: event.skippedCount, dishCount: event.dishCount, reason: event.reason } },
+      };
     case "menu.items":
       return { ...r, menu: { ...r.menu, items: event.items } };
     case "menu.resolved":
@@ -196,6 +201,7 @@ function handleEvent(state: RunState, event: AgentEvent): RunState {
     case "menu.read":
     case "menu.items":
     case "menu.resolved":
+    case "menu.extracted":
     case "reviews.read":
       return refreshResearchStages(withRestaurantEvent(state, event));
     case "reviews.terms":

@@ -46,7 +46,8 @@ export interface RestaurantResearch {
   steps: Record<StepId, StepState>;
   menu: {
     stages: MenuStageNote[];
-    read?: { format: string; languages: string[]; usedVision: boolean };
+    read?: { format: string; languages: string[]; usedVision: boolean; dishCount?: number };
+    extraction?: { status: "extracted" | "partial" | "unavailable" | "failed"; documentCount: number; skippedCount: number; dishCount: number; reason?: string };
     items: MenuItemPreview[];
     resolved?: MenuResolution;
   };
@@ -81,7 +82,7 @@ export interface RunError {
 
 export type OrphanEvent = Extract<
   AgentEvent,
-  { type: "restaurant.step" | "menu.stage" | "menu.read" | "menu.items" | "menu.resolved" | "reviews.read" | "tool" }
+  { type: "restaurant.step" | "menu.stage" | "menu.read" | "menu.items" | "menu.resolved" | "menu.extracted" | "reviews.read" | "tool" }
 >;
 
 export interface RunState {

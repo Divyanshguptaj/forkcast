@@ -62,6 +62,17 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     format: MenuFormat,
     languages: z.array(z.string()),
     usedVision: z.boolean(),
+    dishCount: z.number().int().min(0).optional(),
+  }),
+  z.object({
+    ...base,
+    type: z.literal("menu.extracted"),
+    id: z.string(),
+    status: z.enum(["extracted", "partial", "unavailable", "failed"]),
+    documentCount: z.number().int().min(0),
+    skippedCount: z.number().int().min(0),
+    dishCount: z.number().int().min(0),
+    reason: z.string().max(200).optional(),
   }),
   z.object({
     ...base,

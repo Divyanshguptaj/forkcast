@@ -126,7 +126,7 @@ test.describe("research replay", () => {
 test("design gallery renders every notice and has no critical accessibility violations", async ({ page }, info) => {
   await page.goto("/dev/gallery");
   await expect(page.getByRole("heading", { name: "Forkcast design gallery" })).toBeVisible();
-  await expect(page.locator("[data-notice]")).toHaveCount(10);
+  await expect(page.locator("[data-notice]")).toHaveCount(12);
   await page.screenshot({ path: `${SHOT_DIR}/gallery-${info.project.name}.png` });
   expect(await axeViolations(page)).toEqual([]);
 });

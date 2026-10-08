@@ -60,6 +60,8 @@ export interface LlmStructuredRequest<T> {
   jsonSchema: Record<string, unknown>;
   models?: string[];
   thinkingBudget?: number;
+  maxOutputTokens?: number;
+  timeoutMs?: number;
 }
 
 export interface LlmStructuredResult<T> {

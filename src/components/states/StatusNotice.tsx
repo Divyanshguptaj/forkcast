@@ -10,6 +10,8 @@ export type NoticeKind =
   | "menu_unavailable"
   | "menu_unreadable"
   | "menu_low_confidence"
+  | "menu_partial"
+  | "menu_extraction_failed"
   | "price_unclear"
   | "reviews_unavailable";
 
@@ -61,6 +63,18 @@ export const NOTICE_COPY: Record<NoticeKind, NoticeCopy> = {
     emoji: "📖",
     title: "Menu found, but we couldn't read it",
     body: "This menu couldn't be read automatically, so we haven't judged its dishes. You can open it yourself.",
+    tone: "warn",
+  },
+  menu_partial: {
+    emoji: "🧩",
+    title: "Only part of this menu was read",
+    body: "Some menu documents couldn't be read, so dishes from them are missing. What's shown comes straight from the documents we could read.",
+    tone: "warn",
+  },
+  menu_extraction_failed: {
+    emoji: "🧾",
+    title: "We couldn't read this menu's dishes",
+    body: "The menu was found, but reading its dishes failed. We haven't judged anything on it. You can open it yourself.",
     tone: "warn",
   },
   menu_low_confidence: {

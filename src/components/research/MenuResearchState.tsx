@@ -114,6 +114,17 @@ export function MenuResearchState({ restaurant: r, mocked, showItems }: Props) {
       ) : null}
       {resolved?.status === "unavailable" ? <StatusNotice kind="menu_unavailable" compact body={resolved.reason ? UNAVAILABLE_BODY[resolved.reason] : undefined} /> : null}
       {hasPhotoDoubt ? <StatusNotice kind="menu_low_confidence" compact /> : null}
+      {r.menu.extraction ? (
+        <>
+          <p className="text-sm text-muted">
+            <span aria-hidden="true">🧾 </span>
+            Read {r.menu.extraction.documentCount} menu document{r.menu.extraction.documentCount === 1 ? "" : "s"} · {r.menu.extraction.dishCount} dish{r.menu.extraction.dishCount === 1 ? "" : "es"}
+            {r.menu.extraction.skippedCount > 0 ? ` · ${r.menu.extraction.skippedCount} skipped` : ""}
+          </p>
+          {r.menu.extraction.status === "partial" ? <StatusNotice kind="menu_partial" compact /> : null}
+          {r.menu.extraction.status === "failed" ? <StatusNotice kind="menu_extraction_failed" compact /> : null}
+        </>
+      ) : null}
 
       {showItems && r.menu.items.length > 0 ? (
         <MenuTicket

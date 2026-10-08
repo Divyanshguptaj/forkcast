@@ -97,6 +97,16 @@ describe("degraded menu states", () => {
     expect(row).toHaveTextContent(/official site/);
   });
 
+  it("shows extraction progress and distinguishes partial results", () => {
+    render(<ShortlistBoard state={state} mocked />);
+    const circolo = document.querySelector('[data-restaurant="demo-alba"]') as HTMLElement;
+    expect(circolo).toHaveTextContent("Read 2 menu documents · 4 dishes");
+    expect(circolo.querySelector('[data-notice="menu_partial"]')).toBeNull();
+    const patsa = document.querySelector('[data-restaurant="demo-atelier"]') as HTMLElement;
+    expect(patsa).toHaveTextContent("Read 1 menu document · 2 dishes · 1 skipped");
+    expect(patsa.querySelector('[data-notice="menu_partial"]')).not.toBeNull();
+  });
+
   it("lists where the agent looked when no menu exists", () => {
     render(<ShortlistBoard state={state} mocked />);
     const row = document.querySelector('[data-restaurant="demo-elio"]') as HTMLElement;
