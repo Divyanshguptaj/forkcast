@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { MotionConfig } from "motion/react";
 import { Hero } from "@/components/compose/Hero";
 import { SearchComposer } from "@/components/compose/SearchComposer";
-import { summarize, type ComposerState } from "@/components/compose/composerModel";
+import type { ComposerState } from "@/components/compose/composerModel";
 import { AgentResearchView } from "@/components/research/AgentResearchView";
 import { ResultsPreview } from "@/components/results/ResultsPreview";
 import { useAgentRun } from "@/hooks/useAgentRun";
@@ -30,7 +30,6 @@ export function ForkcastApp() {
   const urlSpeed = params.get("speed");
   const speed = speedOverride ?? (urlSpeed !== null && Number.isFinite(Number(urlSpeed)) ? Number(urlSpeed) : 1);
   const [composer, setComposer] = useState<ComposerState | undefined>(undefined);
-  const headingRef = useRef<HTMLHeadingElement>(null);
 
   const scenario = getScenario(scenarioId);
 
@@ -76,12 +75,11 @@ export function ForkcastApp() {
             </div>
           ) : (
             <div className="pb-10">
-              <h1 ref={headingRef} className="sr-only">
+              <h1 className="sr-only">
                 Forkcast is researching your request
               </h1>
               <AgentResearchView
                 state={state}
-                summary={composer ? summarize(composer) : undefined}
                 mockedStages={scenario.mockedStages}
                 onEdit={edit}
                 onRetry={() => run(scenarioId, speed)}

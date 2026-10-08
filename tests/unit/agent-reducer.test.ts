@@ -142,7 +142,7 @@ describe("full demo research states", () => {
 
   it("keeps the unreadable menu as a graceful state with the official link", () => {
     const viento = state.restaurants["demo-viento"];
-    expect(viento.menu.resolved).toEqual({ status: "found_but_unreadable", documentCount: 0, officialMenuUrl: "https://www.viento.example/" });
+    expect(viento.menu.resolved).toMatchObject({ status: "found_but_unreadable", documentCount: 0, officialMenuUrl: "https://www.viento.example/", reason: "flipbook_viewer" });
     expect(viento.steps.menu.status).toBe("warning");
     expect(viento.steps.reviews.status).toBe("done");
   });

@@ -83,6 +83,20 @@ describe("degraded menu states", () => {
     expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
   });
 
+  it("explains why a menu could not be read, using the resolver's reason", () => {
+    render(<ShortlistBoard state={state} mocked />);
+    const notice = document.querySelector('[data-notice="menu_unreadable"]') as HTMLElement;
+    expect(notice).toHaveTextContent(/online flipbook viewer/);
+    const unavailable = document.querySelector('[data-notice="menu_unavailable"]') as HTMLElement;
+    expect(unavailable).toHaveTextContent(/lists no website/);
+  });
+
+  it("shows which kind of source a found menu stage came from", () => {
+    render(<ShortlistBoard state={state} mocked />);
+    const row = document.querySelector('[data-restaurant="demo-alba"]') as HTMLElement;
+    expect(row).toHaveTextContent(/official site/);
+  });
+
   it("lists where the agent looked when no menu exists", () => {
     render(<ShortlistBoard state={state} mocked />);
     const row = document.querySelector('[data-restaurant="demo-elio"]') as HTMLElement;
@@ -129,6 +143,20 @@ describe("run level states", () => {
     const ended = agentReducer(stateFor("phase2"), { type: "source.ended" });
     render(<AgentResearchView state={ended} />);
     expect(screen.getByText(/Discovery is complete/)).toBeInTheDocument();
+  });
+});
+
+describe("request summary", () => {
+  it("describes the replayed request, not the composer state", () => {
+    render(<AgentResearchView state={stateFor("phase2")} mockedStages={false} />);
+    for (const part of ["Barcelona", "Dinner", "vegetarian", "italian", "under €30"]) {
+      expect(screen.getAllByText(part).length, part).toBeGreaterThan(0);
+    }
+  });
+
+  it("shows no summary before the request is understood", () => {
+    render(<AgentResearchView state={createInitialRunState()} mockedStages={false} />);
+    expect(screen.queryByText("Barcelona")).not.toBeInTheDocument();
   });
 });
 

@@ -11,15 +11,18 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "phase2": "node --env-file=.env.local --import tsx src/dev/phase2.ts"
+    "phase2": "node --env-file=.env.local --import tsx src/dev/phase2.ts",
+    "phase4": "node --env-file=.env.local --import tsx src/dev/phase4.ts"
   },
   "dependencies": {
+    "cheerio": "^1.2.0",
     "lucide-react": "^1.52.0",
     "motion": "^14.0.0",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "undici": "^7.30.0",
+    "unpdf": "^1.8.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {

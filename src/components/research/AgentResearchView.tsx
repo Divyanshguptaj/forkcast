@@ -9,19 +9,18 @@ import type { RunState } from "@/lib/agent/types";
 import { DiscoveryFunnel } from "./DiscoveryFunnel";
 import { ResearchTrail } from "./ResearchTrail";
 import { ShortlistBoard } from "./ShortlistBoard";
-import { stageViews } from "./stageCopy";
+import { requestSummaryParts, stageViews } from "./stageCopy";
 import { ToolActivityStrip } from "./ToolActivityBadge";
 
 interface Props {
   state: RunState;
-  summary?: string[];
   mockedStages?: boolean;
   onEdit?(): void;
   onRetry?(): void;
   children?: ReactNode;
 }
 
-export function AgentResearchView({ state, summary, mockedStages = false, onEdit, onRetry, children }: Props) {
+export function AgentResearchView({ state, mockedStages = false, onEdit, onRetry, children }: Props) {
   const notice = runNotice(state);
   const views = stageViews(state);
   const active = views.find((v) => state.stages[v.id] === "active");
@@ -40,7 +39,7 @@ export function AgentResearchView({ state, summary, mockedStages = false, onEdit
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border-2 border-line bg-surface px-4 py-3">
         <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold">
           <span aria-hidden="true">🔎</span>
-          {(summary ?? []).map((part, i) => (
+          {requestSummaryParts(state.request).map((part, i) => (
             <span key={`${part}-${i}`} className="rounded-full border border-line px-2.5 py-0.5 text-ink">
               {part}
             </span>

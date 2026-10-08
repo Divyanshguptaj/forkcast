@@ -20,12 +20,17 @@ export interface MenuStageNote {
   stage: "site" | "search" | "assets" | "third_party";
   found: boolean;
   candidates: number;
+  sourceTier?: string;
+  documentKind?: string;
+  mediaType?: string;
 }
 
 export interface MenuResolution {
   status: "found" | "partial" | "found_but_unreadable" | "unavailable";
   documentCount: number;
   officialMenuUrl?: string;
+  sourceTier?: string;
+  reason?: string;
 }
 
 export interface RestaurantResearch {

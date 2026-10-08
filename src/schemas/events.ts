@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SourceTier } from "./common";
 import { RecommendationResponseSchema } from "./recommendation";
 import { MenuFormat, MenuItemPreviewSchema, MenuStage } from "./menu";
 import { UserRequestSchema } from "./request";
@@ -50,6 +51,9 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     stage: MenuStage,
     found: z.boolean(),
     candidates: z.number().int().min(0),
+    sourceTier: SourceTier.optional(),
+    documentKind: z.string().max(40).optional(),
+    mediaType: z.string().max(40).optional(),
   }),
   z.object({
     ...base,
@@ -72,6 +76,8 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     status: z.enum(["found", "partial", "found_but_unreadable", "unavailable"]),
     documentCount: z.number().int().min(0),
     officialMenuUrl: z.url().optional(),
+    sourceTier: SourceTier.optional(),
+    reason: z.string().max(40).optional(),
   }),
   z.object({
     ...base,

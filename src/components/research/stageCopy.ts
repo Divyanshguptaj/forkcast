@@ -1,5 +1,6 @@
 import { researchCounts } from "@/lib/agent/selectors";
 import type { RunState, StageId } from "@/lib/agent/types";
+import type { UserRequest } from "@/schemas/request";
 
 export interface StageView {
   id: StageId;
@@ -9,14 +10,18 @@ export interface StageView {
   detail?: string;
 }
 
-function requestSummary(state: RunState): string | undefined {
-  const r = state.request;
-  if (!r) return undefined;
+export function requestSummaryParts(r: UserRequest | undefined): string[] {
+  if (!r) return [];
   const parts = [r.city];
   if (r.meal !== "any") parts.push(r.meal[0].toUpperCase() + r.meal.slice(1));
   parts.push(...r.diet.map((d) => d.replace("_", "-")), ...r.cuisines);
   if (r.budget) parts.push(`under €${r.budget.max}`);
-  return parts.join(" · ");
+  return parts;
+}
+
+function requestSummary(state: RunState): string | undefined {
+  const parts = requestSummaryParts(state.request);
+  return parts.length ? parts.join(" · ") : undefined;
 }
 
 export function stageViews(state: RunState): StageView[] {

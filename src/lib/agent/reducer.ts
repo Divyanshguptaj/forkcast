@@ -63,9 +63,17 @@ function applyRestaurantEvent(r: RestaurantResearch, event: OrphanEvent): Restau
       return { ...r, steps: { ...r.steps, [event.step]: advanceStep(r.steps[event.step], event.status, event.detail) } };
     case "menu.stage": {
       const exists = r.menu.stages.some((s) => s.stage === event.stage);
+      const note = {
+        stage: event.stage,
+        found: event.found,
+        candidates: event.candidates,
+        sourceTier: event.sourceTier,
+        documentKind: event.documentKind,
+        mediaType: event.mediaType,
+      };
       const stages = exists
-        ? r.menu.stages.map((s) => (s.stage === event.stage ? { stage: event.stage, found: event.found, candidates: event.candidates } : s))
-        : [...r.menu.stages, { stage: event.stage, found: event.found, candidates: event.candidates }];
+        ? r.menu.stages.map((s) => (s.stage === event.stage ? note : s))
+        : [...r.menu.stages, note];
       return { ...r, menu: { ...r.menu, stages } };
     }
     case "menu.read":
@@ -77,7 +85,13 @@ function applyRestaurantEvent(r: RestaurantResearch, event: OrphanEvent): Restau
         ...r,
         menu: {
           ...r.menu,
-          resolved: { status: event.status, documentCount: event.documentCount, officialMenuUrl: event.officialMenuUrl },
+          resolved: {
+            status: event.status,
+            documentCount: event.documentCount,
+            officialMenuUrl: event.officialMenuUrl,
+            sourceTier: event.sourceTier,
+            reason: event.reason,
+          },
         },
       };
     case "reviews.read":

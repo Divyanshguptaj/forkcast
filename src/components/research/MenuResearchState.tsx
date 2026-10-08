@@ -16,6 +16,27 @@ const STAGE_LABEL: Record<MenuStageNote["stage"], string> = {
 
 const LANGUAGE_NAME: Record<string, string> = { ca: "Catalan", es: "Spanish", en: "English" };
 
+const TIER_LABEL: Record<string, string> = {
+  official_site: "official site",
+  official_linked: "linked from their site",
+  official_domain_search: "official site",
+  unverified_asset: "web search",
+  third_party: "third-party",
+};
+
+const UNREADABLE_BODY: Record<string, string> = {
+  flipbook_viewer: "Their menu lives in an online flipbook viewer that can't be read automatically. We haven't judged its dishes. You can open it yourself.",
+  blocked: "The site blocks automated reading, so we haven't judged its dishes. You can open the menu yourself.",
+  js_only: "This menu only shows up after a page runs scripts we can't run, so we haven't judged its dishes. You can open it yourself.",
+  unsupported_format: "The menu is in a file format we can't read, so we haven't judged its dishes. You can open it yourself.",
+  fetch_failed: "We couldn't download this menu just now, so we haven't judged its dishes. You can open it yourself.",
+};
+
+const UNAVAILABLE_BODY: Record<string, string> = {
+  no_website: "This place lists no website, and searching the web turned up no menu. We won't guess what's on it.",
+  identity_mismatch: "The only menus we found seem to belong to a different restaurant, so we ignored them. We won't guess what's on this one.",
+};
+
 function languages(codes: string[]): string {
   return codes.map((c) => LANGUAGE_NAME[c] ?? c).join(" + ");
 }
@@ -36,6 +57,7 @@ function StageTrail({ stages }: { stages: MenuStageNote[] }) {
           {STAGE_LABEL[s.stage]}
           <span className="font-normal text-muted">
             {s.found ? `${s.candidates} page${s.candidates === 1 ? "" : "s"}` : s.candidates > 0 ? `${s.candidates} checked, no menu` : "nothing"}
+            {s.found && s.sourceTier ? ` · ${TIER_LABEL[s.sourceTier] ?? s.sourceTier}` : ""}
           </span>
         </li>
       ))}
@@ -82,6 +104,7 @@ export function MenuResearchState({ restaurant: r, mocked, showItems }: Props) {
         <StatusNotice
           kind="menu_unreadable"
           compact
+          body={resolved.reason ? UNREADABLE_BODY[resolved.reason] : undefined}
           actions={
             <ButtonLink href={resolved.officialMenuUrl} variant="secondary">
               View official menu <ExternalLink aria-hidden="true" className="size-4" />
@@ -89,7 +112,7 @@ export function MenuResearchState({ restaurant: r, mocked, showItems }: Props) {
           }
         />
       ) : null}
-      {resolved?.status === "unavailable" ? <StatusNotice kind="menu_unavailable" compact /> : null}
+      {resolved?.status === "unavailable" ? <StatusNotice kind="menu_unavailable" compact body={resolved.reason ? UNAVAILABLE_BODY[resolved.reason] : undefined} /> : null}
       {hasPhotoDoubt ? <StatusNotice kind="menu_low_confidence" compact /> : null}
 
       {showItems && r.menu.items.length > 0 ? (

@@ -92,11 +92,12 @@ const TONES = {
 interface Props {
   kind: NoticeKind;
   compact?: boolean;
+  body?: string;
   actions?: ReactNode;
   className?: string;
 }
 
-export function StatusNotice({ kind, compact = false, actions, className }: Props) {
+export function StatusNotice({ kind, compact = false, body, actions, className }: Props) {
   const copy = NOTICE_COPY[kind];
   const alert = copy.tone === "problem";
   return (
@@ -110,7 +111,7 @@ export function StatusNotice({ kind, compact = false, actions, className }: Prop
       </span>
       <div className="min-w-0 space-y-1">
         <p className={cx("font-display font-bold text-ink", compact ? "text-base" : "text-xl")}>{copy.title}</p>
-        <p className={cx("text-muted", compact ? "text-sm" : "text-base")}>{copy.body}</p>
+        <p className={cx("text-muted", compact ? "text-sm" : "text-base")}>{body ?? copy.body}</p>
         {actions ? <div className="flex flex-wrap gap-2 pt-2">{actions}</div> : null}
       </div>
     </div>

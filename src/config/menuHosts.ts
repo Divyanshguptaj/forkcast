@@ -26,6 +26,27 @@ export const THIRD_PARTY_ALLOWLIST = [
   "just-eat.es",
 ] as const;
 
+export const SOCIAL_AND_MAP_HOSTS = [
+  "instagram.com",
+  "facebook.com",
+  "fb.com",
+  "twitter.com",
+  "x.com",
+  "tiktok.com",
+  "youtube.com",
+  "youtu.be",
+  "linkedin.com",
+  "pinterest.com",
+  "maps.google.com",
+  "goo.gl",
+  "google.com",
+  "apple.com",
+  "wa.me",
+  "whatsapp.com",
+  "t.me",
+  "wixsite.com/dashboard",
+] as const;
+
 export const MENU_LEXICON = [
   "menu",
   "menú",
