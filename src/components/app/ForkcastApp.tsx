@@ -7,6 +7,7 @@ import { Hero } from "@/components/compose/Hero";
 import { SearchComposer } from "@/components/compose/SearchComposer";
 import type { ComposerState } from "@/components/compose/composerModel";
 import { AgentResearchView } from "@/components/research/AgentResearchView";
+import { RecommendationResults } from "@/components/results/RecommendationResults";
 import { ResultsPreview } from "@/components/results/ResultsPreview";
 import { useAgentRun } from "@/hooks/useAgentRun";
 import { createReplaySource } from "@/lib/agent/replay";
@@ -84,7 +85,8 @@ export function ForkcastApp() {
                 onEdit={edit}
                 onRetry={() => run(scenarioId, speed)}
               >
-                {done && scenario.withResultsPreview ? <ResultsPreview cards={RESULT_PREVIEW} /> : null}
+                {state.recommendations ? <RecommendationResults set={state.recommendations} /> : null}
+                {done && !state.recommendations && scenario.withResultsPreview ? <ResultsPreview cards={RESULT_PREVIEW} /> : null}
               </AgentResearchView>
             </div>
           )}

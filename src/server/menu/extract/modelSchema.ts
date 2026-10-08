@@ -52,7 +52,7 @@ export const ModelDocumentSchema = z.object({
   languages: z.array(z.enum(["ca", "es", "en", "other"]).catch("other")).default([]).transform((l) => l.slice(0, 4)),
   omittedNonMatchingCount: z.number().int().min(0).max(1000).catch(0),
   setMenus: lenientArray(ModelSetMenuSchema, 12),
-  dishes: lenientArray(ModelDishSchema, 60),
+  dishes: lenientArray(ModelDishSchema, 120),
 });
 
 export const ModelExtractionSchema = z.object({ documents: lenientArray(ModelDocumentSchema, 6) });
@@ -60,6 +60,21 @@ export const ModelExtractionSchema = z.object({ documents: lenientArray(ModelDoc
 export const PriceCheckSchema = z.object({
   lines: z.array(z.object({ dish: z.string().max(200), price: z.string().max(40).nullish().transform((v) => v ?? undefined) })).max(120),
 });
+
+export function mergeModelDocuments(documentId: string, parts: ModelDocument[]): ModelDocument {
+  const usable = parts.find((p) => p.verdict !== "unreadable" && p.dishes.length > 0) ?? parts.find((p) => p.verdict !== "unreadable") ?? parts[0];
+  const seen = new Set<string>();
+  const setMenus = parts.flatMap((p) => p.setMenus).filter((m) => (seen.has(m.id) ? false : seen.add(m.id)));
+  return {
+    documentId,
+    verdict: usable.verdict,
+    reason: usable.reason,
+    languages: [...new Set(parts.flatMap((p) => p.languages))].slice(0, 4),
+    omittedNonMatchingCount: parts.reduce((n, p) => n + p.omittedNonMatchingCount, 0),
+    setMenus,
+    dishes: parts.flatMap((p) => p.dishes),
+  };
+}
 
 export type ModelDish = z.infer<typeof ModelDishSchema>;
 export type ModelDocument = z.infer<typeof ModelDocumentSchema>;

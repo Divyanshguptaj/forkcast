@@ -16,6 +16,7 @@ export interface PromptDocument {
   documentKind: string;
   sourceUrl: string;
   text?: string;
+  part?: { index: number; count: number };
 }
 
 export function buildSystemPrompt(focus: ExtractionFocus): string {
@@ -45,6 +46,7 @@ For each document:
    - status not_suitable when the menu names meat, fish, shellfish, or (for vegan) egg, dairy, honey. Quote the words.
    - status unknown when ingredients are unclear or could hide animal products: stocks (caldo, fumet), ham or bacon in beans/artichokes/rice, croquetas, ensaladilla, lard, sofregit, gelatin, anchovies in salads or sauces.
    - Never assume a dish is vegetarian or vegan from its name alone. Fish and shellfish are NOT vegetarian. Eggs and dairy are vegetarian but not vegan.
+If the document header has a part="i/n" attribute, the text is only part i of n of one menu: extract only the dishes printed in this part.
 Return only the JSON in the required schema.`;
 }
 
@@ -54,7 +56,7 @@ function sanitizeDocumentText(text: string): string {
 
 function header(doc: PromptDocument): string {
   const r = doc.restaurant;
-  return `<DOCUMENT id="${doc.documentId}" targetRestaurant="${r.name.replace(/"/g, "'")}" targetAddress="${(r.address ?? "unknown").replace(/"/g, "'")}" city="${r.city}" expectedKind="${doc.documentKind}" source="${doc.sourceUrl}">`;
+  return `<DOCUMENT id="${doc.documentId}" targetRestaurant="${r.name.replace(/"/g, "'")}" targetAddress="${(r.address ?? "unknown").replace(/"/g, "'")}" city="${r.city}" expectedKind="${doc.documentKind}" source="${doc.sourceUrl}"${doc.part ? ` part="${doc.part.index}/${doc.part.count}"` : ""}>`;
 }
 
 export function buildTextParts(docs: PromptDocument[]): LlmPart[] {

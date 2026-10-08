@@ -26,19 +26,28 @@ export const DishDietSchema = z.object({
   glutenFree: DietVerdictSchema,
 });
 
+export const PriceBasis = z.enum(["text_adjacent", "text_elsewhere", "image_single_read", "image_agreed", "image_conflict"]);
+
 export const DishPriceSchema = z
   .object({
     label: z.string().max(60).optional(),
     amount: z.number().min(0.01).max(1000).optional(),
+    alternateAmount: z.number().min(0.01).max(1000).optional(),
     currency: z.string().length(3).default("EUR"),
     raw: z.string().max(40).optional(),
     status: PriceStatus,
+    confidence: Confidence.optional(),
+    basis: PriceBasis.optional(),
   })
   .superRefine((p, ctx) => {
-    const noNumber = p.status === "absent" || p.status === "disputed";
-    if (noNumber && p.amount !== undefined) ctx.addIssue({ code: "custom", path: ["amount"], message: `amount must be omitted when status is ${p.status}` });
-    if (!noNumber && p.amount === undefined) ctx.addIssue({ code: "custom", path: ["status"], message: "status implies an amount but none is set" });
+    if (p.status === "absent" && (p.amount !== undefined || p.alternateAmount !== undefined)) ctx.addIssue({ code: "custom", path: ["amount"], message: "amount must be omitted when status is absent" });
+    if (p.status !== "absent" && p.amount === undefined) ctx.addIssue({ code: "custom", path: ["status"], message: "status implies an amount but none is set" });
+    if (p.alternateAmount !== undefined && p.status !== "disputed") ctx.addIssue({ code: "custom", path: ["alternateAmount"], message: "alternateAmount is only valid for a disputed price" });
   });
+
+export function isBudgetGradePrice(price: Pick<z.infer<typeof DishPriceSchema>, "status" | "amount">): price is { status: "verified" | "ocr_agreed"; amount: number } {
+  return (price.status === "verified" || price.status === "ocr_agreed") && price.amount !== undefined;
+}
 
 export const ExtractionMethod = z.enum(["html_text", "pdf_text", "vision"]);
 
@@ -125,6 +134,7 @@ export type DietBasisValue = z.infer<typeof DietBasis>;
 export type DietVerdict = z.infer<typeof DietVerdictSchema>;
 export type DishDiet = z.infer<typeof DishDietSchema>;
 export type DishPrice = z.infer<typeof DishPriceSchema>;
+export type PriceBasisValue = z.infer<typeof PriceBasis>;
 export type ExtractionMethodValue = z.infer<typeof ExtractionMethod>;
 export type ExtractedDish = z.infer<typeof ExtractedDishSchema>;
 export type SetMenu = z.infer<typeof SetMenuSchema>;

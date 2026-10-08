@@ -1,6 +1,7 @@
 import type { AgentEvent } from "@/schemas/events";
 import type { MenuItemPreview } from "@/schemas/menu";
 import type { RecommendationResponse } from "@/schemas/recommendation";
+import type { RecommendationSet } from "@/schemas/recommendations";
 import type { UserRequest } from "@/schemas/request";
 
 export const STAGE_ORDER = ["understand", "search", "shortlist", "research", "compare", "ready"] as const;
@@ -103,6 +104,7 @@ export interface RunState {
   rankDone: boolean;
   explainDone: boolean;
   result?: RecommendationResponse;
+  recommendations?: RecommendationSet;
   error?: RunError;
 }
 

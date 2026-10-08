@@ -1,6 +1,7 @@
 import { buildTimeline, type ReplayStep, type TimelineEntry } from "@/lib/agent/replay";
+import { recordedTimeline } from "./recorded";
 
-export type ScenarioId = "full-demo" | "phase2" | "no-results" | "places-down" | "timeout";
+export type ScenarioId = "recorded" | "recorded-no-exact" | "full-demo" | "phase2" | "no-results" | "places-down" | "timeout";
 
 export interface ReplayScenario {
   id: ScenarioId;
@@ -160,6 +161,22 @@ function simulatedResearch(startAt: number): TimelineEntry[] {
 }
 
 export const SCENARIOS: Record<ScenarioId, ReplayScenario> = {
+  recorded: {
+    id: "recorded",
+    label: "Recorded run",
+    description: "A real Barcelona run (Places, menus and Gemini readings recorded 2026-10-08), ranked by the real engine.",
+    mockedStages: false,
+    withResultsPreview: false,
+    steps: buildTimeline("recorded-barcelona", recordedTimeline()),
+  },
+  "recorded-no-exact": {
+    id: "recorded-no-exact",
+    label: "No exact match",
+    description: "The same recorded run with a EUR 5 budget, so no restaurant fully matches.",
+    mockedStages: false,
+    withResultsPreview: false,
+    steps: buildTimeline("recorded-barcelona-5", recordedTimeline({ budgetMax: 5 })),
+  },
   "full-demo": {
     id: "full-demo",
     label: "Full demo",
@@ -215,5 +232,5 @@ export const SCENARIOS: Record<ScenarioId, ReplayScenario> = {
 export const SCENARIO_LIST: ReplayScenario[] = Object.values(SCENARIOS);
 
 export function getScenario(id: string | undefined): ReplayScenario {
-  return (id && (SCENARIOS as Record<string, ReplayScenario>)[id]) || SCENARIOS["full-demo"];
+  return (id && (SCENARIOS as Record<string, ReplayScenario>)[id]) || SCENARIOS.recorded;
 }

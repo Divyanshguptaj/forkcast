@@ -10,6 +10,12 @@ export interface ExtractLimits {
   maxTextDocsPerCall: number;
   maxCharsPerCall: number;
   maxLlmRequests: number;
+  chunkChars: number;
+  maxChunksPerDoc: number;
+  maxOutputTokens: number;
+  priceCheckMaxOutputTokens: number;
+  maxInputTokensPerRun: number;
+  maxDishesPerDocument: number;
   llmConcurrency: number;
   fetchConcurrency: number;
   llmTimeoutMs: number;
@@ -28,6 +34,12 @@ export const DEFAULT_EXTRACT_LIMITS: ExtractLimits = {
   maxTextDocsPerCall: 1,
   maxCharsPerCall: 45_000,
   maxLlmRequests: 10,
+  chunkChars: 16_000,
+  maxChunksPerDoc: 2,
+  maxOutputTokens: 7_000,
+  priceCheckMaxOutputTokens: 2_500,
+  maxInputTokensPerRun: 160_000,
+  maxDishesPerDocument: 60,
   llmConcurrency: 6,
   fetchConcurrency: 4,
   llmTimeoutMs: 60_000,

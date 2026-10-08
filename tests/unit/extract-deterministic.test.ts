@@ -177,7 +177,7 @@ describe("model output validation", () => {
     const out = build([dish("Pan con tomate", { priceRaw: "4,50 €", translatedName: "Bread with tomato" }), dish("Croquetas de jamón", { priceRaw: "8,50 €" })]);
     expect(out.dishes).toHaveLength(2);
     expect(out.dishes[0]).toMatchObject({ originalName: "Pan con tomate", translatedName: "Bread with tomato" });
-    expect(out.dishes[0].prices).toEqual([{ amount: 4.5, currency: "EUR", raw: "4,50 €", status: "verified" }]);
+    expect(out.dishes[0].prices).toEqual([{ amount: 4.5, currency: "EUR", raw: "4,50 €", status: "verified", basis: "text_adjacent", confidence: 0.9 }]);
     for (const d of out.dishes) expect(ExtractedDishSchema.safeParse(d).success).toBe(true);
   });
 

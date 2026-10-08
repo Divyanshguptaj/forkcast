@@ -4,17 +4,20 @@ import type { MenuItemPreview } from "@/schemas/menu";
 import type { CandidateSummary, MenuResolution } from "@/schemas/menuResolution";
 import type { EventEmitter } from "../../agent/events";
 import { GeminiError } from "../../providers/gemini/client";
-import type { Fetcher, LlmProvider } from "../../providers/types";
+import type { Fetcher, LlmProvider, LlmStructuredResult } from "../../providers/types";
 import { ResolverBudget, DEFAULT_RESOLVER_LIMITS } from "../resolver/budget";
 import { ResolverFetcher, createSharedCache, type ResolverSharedCache } from "../resolver/fetcher";
 import { assessIdentity } from "../resolver/identity";
 import { createLimiter } from "../resolver/limiter";
 import type { ResolverRestaurant } from "../resolver/resolver";
+import { splitIntoChunks } from "./chunk";
+import { representativeDishes } from "./coverage";
 import { mergeDishes } from "./dedupe";
 import { deterministicDocument } from "./deterministic";
 import { DEFAULT_EXTRACT_LIMITS, type ExtractLimits } from "./limits";
 import { loadDocument, type LoadedDocument } from "./loader";
-import { EXTRACTION_JSON_SCHEMA, ModelExtractionSchema, PRICE_CHECK_JSON_SCHEMA, PriceCheckSchema, type ModelDocument } from "./modelSchema";
+import { ExtractionCache, contentKey } from "./modelCache";
+import { EXTRACTION_JSON_SCHEMA, ModelExtractionSchema, PRICE_CHECK_JSON_SCHEMA, PriceCheckSchema, mergeModelDocuments, type ModelDocument } from "./modelSchema";
 import { parsePriceText } from "./price";
 import { PRICE_CHECK_SYSTEM, buildPriceCheckParts, buildSystemPrompt, buildTextParts, buildVisionParts, type ExtractionFocus, type PromptDocument } from "./prompts";
 import { buildFromModel, type SourceDoc } from "./validate";
@@ -27,6 +30,7 @@ export interface ExtractInput {
 export interface ExtractDeps {
   fetcher: Fetcher;
   sharedCache?: ResolverSharedCache;
+  modelCache?: ExtractionCache;
   llm?: LlmProvider;
   priceCheckModel?: string;
   emitter?: EventEmitter;
@@ -37,6 +41,15 @@ export interface ExtractDeps {
   now?: () => number;
 }
 
+export interface ModelCallRecord {
+  label: string;
+  model?: string;
+  latencyMs: number;
+  inputTokens: number;
+  outputTokens: number;
+  truncated: boolean;
+}
+
 export interface ExtractionRunStats {
   llmRequests: number;
   visionRequests: number;
@@ -44,6 +57,16 @@ export interface ExtractionRunStats {
   inputTokens: number;
   outputTokens: number;
   durationMs: number;
+  cacheHits: number;
+  quotaSkipped: number;
+  truncatedResponses: number;
+  modelLatencyMs: number;
+  calls: ModelCallRecord[];
+}
+
+interface ChunkOutcome {
+  model?: ModelDocument;
+  failure?: string;
 }
 
 interface Work {
@@ -53,15 +76,27 @@ interface Work {
   documentId: string;
   loaded?: LoadedDocument;
   source?: SourceDoc;
-  model?: ModelDocument;
+  chunks?: string[];
+  outcomes?: ChunkOutcome[];
   doc: ExtractedDocument;
   dishes: ExtractedDish[];
   setMenus: SetMenu[];
 }
 
+interface Job {
+  works: Work[];
+  chunkIndex: number;
+  texts: string[];
+  part?: { index: number; count: number };
+}
+
 const emptyUsage = (): ExtractionUsage => ({ geminiRequests: 0, visionRequests: 0, priceCheckRequests: 0, inputTokens: 0, outputTokens: 0, bytesFetched: 0 });
 
 const FORMAT_FOR: Record<string, "html" | "pdf_text" | "pdf_scanned" | "image"> = { html_text: "html", pdf_text: "pdf_text" };
+
+const SYSTEM_PROMPT_TOKENS = 1_100;
+const VISION_INPUT_TOKENS = 2_000;
+const estimateTokens = (chars: number) => Math.ceil(chars / 3.2);
 
 function offeringFor(verdict: ModelDocument["verdict"], kind: CandidateSummary["documentKind"]): ExtractedDish["offering"] {
   if (verdict === "set_menu" || kind === "set_menu_or_groups") return "set_menu";
@@ -120,22 +155,29 @@ export function selectDocuments(inputs: ExtractInput[], limits: Pick<ExtractLimi
   return chosen;
 }
 
+function failureReason(err: unknown): string {
+  if (err instanceof GeminiError) return err.code === "quota_exhausted" ? "model daily quota exhausted" : `model ${err.code}`;
+  return "model error";
+}
+
 export async function extractMenus(inputs: ExtractInput[], deps: ExtractDeps): Promise<{ results: MenuExtraction[]; stats: ExtractionRunStats }> {
   const now = deps.now ?? Date.now;
   const started = now();
   const limits: ExtractLimits = { ...DEFAULT_EXTRACT_LIMITS, ...deps.limits };
   const focus = deps.focus ?? "plant_based";
   const cache = deps.sharedCache ?? createSharedCache();
+  const modelCache = deps.modelCache ?? new ExtractionCache();
   const budget = new ResolverBudget({ ...DEFAULT_RESOLVER_LIMITS, maxDirectFetches: 60, maxHtmlPages: 60, maxBytes: 300 * 1024 * 1024 });
   const fetchLimiter = createLimiter(limits.fetchConcurrency);
   const llmLimiter = createLimiter(limits.llmConcurrency);
   const fetcher = new ResolverFetcher(deps.fetcher, budget, fetchLimiter, deps.signal, {}, cache.fetch);
-  const stats: ExtractionRunStats = { llmRequests: 0, visionRequests: 0, priceCheckRequests: 0, inputTokens: 0, outputTokens: 0, durationMs: 0 };
+  const stats: ExtractionRunStats = { llmRequests: 0, visionRequests: 0, priceCheckRequests: 0, inputTokens: 0, outputTokens: 0, durationMs: 0, cacheHits: 0, quotaSkipped: 0, truncatedResponses: 0, modelLatencyMs: 0, calls: [] };
   const warnings = new Map<string, string[]>();
   const usage = new Map<string, ExtractionUsage>();
   const usageFor = (id: string) => usage.get(id) ?? usage.set(id, emptyUsage()).get(id)!;
   const warn = (id: string, message: string) => warnings.set(id, [...(warnings.get(id) ?? []), message.slice(0, 200)]);
   const emit = deps.emitter?.emit.bind(deps.emitter);
+  let committedInputTokens = 0;
 
   // 1. select documents
   const works: Work[] = [];
@@ -229,29 +271,41 @@ export async function extractMenus(inputs: ExtractInput[], deps: ExtractDeps): P
     }
   }
 
-  const batches: Work[][] = [];
+  const jobs: Job[] = [];
+  const singles: Work[] = [];
+  for (const w of textWorks) {
+    const text = w.loaded?.kind === "text" ? w.loaded.text : "";
+    const { chunks, droppedChars } = splitIntoChunks(text, limits.chunkChars, limits.maxChunksPerDoc);
+    w.chunks = chunks;
+    w.outcomes = chunks.map(() => ({}));
+    if (droppedChars > 0) w.doc.warnings.push(`The last ${droppedChars} characters of this menu were not read`);
+    if (chunks.length > 1) chunks.forEach((chunk, i) => jobs.push({ works: [w], chunkIndex: i, texts: [chunk], part: { index: i + 1, count: chunks.length } }));
+    else singles.push(w);
+  }
   let current: Work[] = [];
   let chars = 0;
-  for (const w of textWorks) {
-    const len = w.loaded?.kind === "text" ? w.loaded.text.length : 0;
-    if (current.length >= limits.maxTextDocsPerCall || (current.length > 0 && chars + len > limits.maxCharsPerCall)) {
-      batches.push(current);
-      current = [];
-      chars = 0;
-    }
+  const flush = () => {
+    if (current.length) jobs.push({ works: current, chunkIndex: 0, texts: current.map((w) => w.chunks![0]) });
+    current = [];
+    chars = 0;
+  };
+  for (const w of singles) {
+    const len = w.chunks![0].length;
+    if (current.length >= limits.maxTextDocsPerCall || (current.length > 0 && chars + len > limits.maxCharsPerCall)) flush();
     current.push(w);
     chars += len;
   }
-  if (current.length) batches.push(current);
+  flush();
 
   const budgetLeft = () => limits.maxLlmRequests - (stats.llmRequests + stats.priceCheckRequests);
 
-  const promptDoc = (w: Work): PromptDocument => ({
+  const promptDoc = (w: Work, text?: string, part?: Job["part"]): PromptDocument => ({
     documentId: w.documentId,
     restaurant: { name: w.input.restaurant.name, address: w.input.restaurant.address, city: w.input.restaurant.city },
     documentKind: w.candidate.documentKind,
     sourceUrl: w.candidate.url,
-    text: w.loaded?.kind === "text" ? w.loaded.text : undefined,
+    text,
+    part,
   });
 
   const startSteps = (list: Work[], label: string, vision: boolean) => {
@@ -265,6 +319,22 @@ export async function extractMenus(inputs: ExtractInput[], deps: ExtractDeps): P
 
   const system = buildSystemPrompt(focus);
 
+  const callModel = async <T>(label: string, run: () => Promise<LlmStructuredResult<T>>): Promise<LlmStructuredResult<T>> => {
+    const out = await llmLimiter.run(async () => {
+      if (deps.llm?.available?.() === false) {
+        stats.quotaSkipped++;
+        throw new GeminiError("quota_exhausted", "Every configured Gemini model is paused", 429);
+      }
+      return run();
+    });
+    stats.inputTokens += out.inputTokens ?? 0;
+    stats.outputTokens += out.outputTokens ?? 0;
+    stats.modelLatencyMs += out.durationMs;
+    if (out.truncated) stats.truncatedResponses++;
+    stats.calls.push({ label, model: out.model, latencyMs: out.durationMs, inputTokens: out.inputTokens ?? 0, outputTokens: out.outputTokens ?? 0, truncated: Boolean(out.truncated) });
+    return out;
+  };
+
   const applyModel = (w: Work, model: ModelDocument | undefined, fallbackReason: string) => {
     const source = w.source!;
     if (!model) {
@@ -272,7 +342,6 @@ export async function extractMenus(inputs: ExtractInput[], deps: ExtractDeps): P
       w.doc.reason = fallbackReason;
       return;
     }
-    w.model = model;
     w.doc.languages = model.languages.filter((l, i, a) => a.indexOf(l) === i);
     w.doc.omittedNonMatchingCount = model.omittedNonMatchingCount;
     if (model.verdict === "drinks_only" || model.verdict === "legal_or_other" || model.verdict === "wrong_restaurant") {
@@ -286,59 +355,109 @@ export async function extractMenus(inputs: ExtractInput[], deps: ExtractDeps): P
       return;
     }
     const built = buildFromModel(model, { source, offeringDefault: offeringFor(model.verdict, w.candidate.documentKind), setMenuIds: new Set() });
-    w.dishes = built.dishes;
+    const kept = representativeDishes(built.dishes, limits.maxDishesPerDocument);
+    w.dishes = kept;
     w.setMenus = built.setMenus;
-    w.doc.dishCount = built.dishes.length;
+    w.doc.dishCount = kept.length;
     w.doc.droppedDishCount = built.dropped;
-    w.doc.warnings = built.warnings.slice(0, 5);
-    if (built.dishes.length === 0) {
+    w.doc.warnings = [...w.doc.warnings, ...built.warnings, ...(kept.length < built.dishes.length ? [`Kept ${kept.length} of ${built.dishes.length} dishes, spread across menu sections`] : [])].slice(0, 5);
+    if (kept.length === 0) {
       w.doc.status = "empty";
       w.doc.reason = built.dropped > 0 ? "every extracted dish failed validation" : "no dishes found";
     } else {
-      w.doc.status = built.dropped > built.dishes.length ? "partial" : "extracted";
+      w.doc.status = built.dropped > kept.length ? "partial" : "extracted";
     }
   };
 
-  const runBatch = async (batch: Work[]): Promise<void> => {
-    if (!deps.llm || budgetLeft() < 1 || deps.signal?.aborted) {
-      for (const w of batch) {
-        const det = w.loaded?.kind === "text" ? deterministicDocument(w.documentId, w.loaded.text) : undefined;
-        applyModel(w, det, deps.llm ? "model request budget reached" : "model unavailable");
-        if (det && w.doc.status !== "failed") {
-          w.doc.status = w.doc.status === "extracted" ? "partial" : w.doc.status;
-          w.doc.reason = "read with the deterministic parser only (no translation or dietary reading)";
-        }
+  const finalizeText = (w: Work) => {
+    const chunks = w.chunks!;
+    const outcomes = w.outcomes!;
+    const parts: ModelDocument[] = [];
+    let fallbackReason: string | undefined;
+    let fallbackChunks = 0;
+    outcomes.forEach((outcome, i) => {
+      if (outcome.model) {
+        parts.push(outcome.model);
+        return;
       }
+      fallbackChunks++;
+      fallbackReason ??= outcome.failure ?? "model unavailable";
+      parts.push(deterministicDocument(w.documentId, chunks[i]));
+    });
+    applyModel(w, mergeModelDocuments(w.documentId, parts), fallbackReason ?? "model unavailable");
+    if (fallbackChunks > 0 && w.doc.status !== "failed") {
+      w.doc.status = w.doc.status === "extracted" ? "partial" : w.doc.status;
+      w.doc.reason = `${fallbackReason}; ${fallbackChunks === chunks.length ? "read with the deterministic parser only (no translation or dietary reading)" : "part of the menu was read with the deterministic parser"}`.slice(0, 200);
+    }
+  };
+
+  const runJob = async (job: Job): Promise<void> => {
+    const outcomeOf = (w: Work) => w.outcomes![job.chunkIndex];
+    const fail = (reason: string) => {
+      for (const w of job.works) outcomeOf(w).failure = reason;
+    };
+    if (!deps.llm || budgetLeft() < 1 || deps.signal?.aborted) {
+      fail(deps.llm ? "model request budget reached" : "model unavailable");
       return;
     }
-    stats.llmRequests++;
-    startSteps(batch, "Reading menu text", false);
-    for (const w of batch) usageFor(w.input.restaurant.placeId).geminiRequests++;
+    if (deps.llm.available?.() === false) {
+      stats.quotaSkipped++;
+      fail("model daily quota exhausted");
+      return;
+    }
+    const estimated = SYSTEM_PROMPT_TOKENS + estimateTokens(job.texts.reduce((n, t) => n + t.length, 0));
+    if (committedInputTokens + estimated > limits.maxInputTokensPerRun) {
+      fail("input token budget reached");
+      return;
+    }
+
+    const single = job.works.length === 1;
+    const w0 = job.works[0];
+    const request = (docs: PromptDocument[]) => ({
+      label: "menu-extract-text",
+      system,
+      parts: buildTextParts(docs),
+      schema: ModelExtractionSchema,
+      jsonSchema: EXTRACTION_JSON_SCHEMA as unknown as Record<string, unknown>,
+      timeoutMs: limits.llmTimeoutMs,
+      maxOutputTokens: limits.maxOutputTokens,
+    });
+
+    startSteps(job.works, job.part ? `Reading menu text (part ${job.part.index} of ${job.part.count})` : "Reading menu text", false);
     try {
-      const out = await llmLimiter.run(() =>
-        deps.llm!.generateStructured(
-          { label: "menu-extract-text", system, parts: buildTextParts(batch.map(promptDoc)), schema: ModelExtractionSchema, jsonSchema: EXTRACTION_JSON_SCHEMA as unknown as Record<string, unknown>, timeoutMs: limits.llmTimeoutMs },
-          { signal: deps.signal },
-        ),
-      );
-      stats.inputTokens += out.inputTokens ?? 0;
-      stats.outputTokens += out.outputTokens ?? 0;
-      for (const w of batch) {
-        const share = Math.ceil((out.inputTokens ?? 0) / batch.length);
-        usageFor(w.input.restaurant.placeId).inputTokens += share;
-        usageFor(w.input.restaurant.placeId).outputTokens += Math.ceil((out.outputTokens ?? 0) / batch.length);
-        applyModel(w, out.data.documents.find((d) => d.documentId === w.documentId), "the model did not return this document");
+      if (single) {
+        const key = contentKey(focus, w0.input.restaurant.name, w0.input.restaurant.address ?? "", w0.candidate.documentKind, job.texts[0]);
+        const { doc, hit } = await modelCache.getOrRun(key, async () => {
+          committedInputTokens += estimated;
+          stats.llmRequests++;
+          usageFor(w0.input.restaurant.placeId).geminiRequests++;
+          const out = await callModel("menu-extract-text", () => deps.llm!.generateStructured(request([promptDoc(w0, job.texts[0], job.part)]), { signal: deps.signal }));
+          usageFor(w0.input.restaurant.placeId).inputTokens += out.inputTokens ?? 0;
+          usageFor(w0.input.restaurant.placeId).outputTokens += out.outputTokens ?? 0;
+          const found = out.data.documents.find((d) => d.documentId === w0.documentId) ?? out.data.documents[0];
+          if (!found) throw new GeminiError("invalid_response", "The model did not return this document");
+          return found;
+        });
+        if (hit) stats.cacheHits++;
+        outcomeOf(w0).model = { ...doc, documentId: w0.documentId };
+        return;
+      }
+      committedInputTokens += estimated;
+      stats.llmRequests++;
+      for (const w of job.works) usageFor(w.input.restaurant.placeId).geminiRequests++;
+      const out = await callModel("menu-extract-text", () => deps.llm!.generateStructured(request(job.works.map((w, i) => promptDoc(w, job.texts[i]))), { signal: deps.signal }));
+      for (const w of job.works) {
+        usageFor(w.input.restaurant.placeId).inputTokens += Math.ceil((out.inputTokens ?? 0) / job.works.length);
+        usageFor(w.input.restaurant.placeId).outputTokens += Math.ceil((out.outputTokens ?? 0) / job.works.length);
+        const found = out.data.documents.find((d) => d.documentId === w.documentId);
+        if (found) outcomeOf(w).model = found;
+        else outcomeOf(w).failure = "the model did not return this document";
       }
     } catch (err) {
-      const reason = err instanceof GeminiError ? `model ${err.code}` : "model error";
-      for (const w of batch) {
+      const reason = failureReason(err);
+      for (const w of job.works) {
+        outcomeOf(w).failure = reason;
         warn(w.input.restaurant.placeId, `Menu text model call failed (${reason}); used the deterministic parser`);
-        const det = w.loaded?.kind === "text" ? deterministicDocument(w.documentId, w.loaded.text) : undefined;
-        applyModel(w, det, reason);
-        if (det && w.doc.status !== "failed") {
-          w.doc.status = w.doc.status === "extracted" ? "partial" : w.doc.status;
-          w.doc.reason = `${reason}; read with the deterministic parser only`;
-        }
       }
     }
   };
@@ -352,26 +471,43 @@ export async function extractMenus(inputs: ExtractInput[], deps: ExtractDeps): P
       w.doc.reason = deps.llm ? "model request budget reached" : "vision unavailable";
       return;
     }
-    stats.llmRequests++;
-    stats.visionRequests++;
-    usageFor(id).geminiRequests++;
-    usageFor(id).visionRequests++;
+    if (deps.llm.available?.() === false) {
+      stats.quotaSkipped++;
+      w.doc.status = "failed";
+      w.doc.reason = "model daily quota exhausted";
+      return;
+    }
+    if (committedInputTokens + VISION_INPUT_TOKENS > limits.maxInputTokensPerRun) {
+      w.doc.status = "failed";
+      w.doc.reason = "input token budget reached";
+      return;
+    }
     startSteps([w], loaded.mimeType === "application/pdf" ? "Reading a scanned menu" : "Reading an image menu", true);
     try {
-      const out = await llmLimiter.run(() =>
-        deps.llm!.generateStructured(
-          { label: "menu-extract-vision", system, parts: buildVisionParts(promptDoc(w), loaded.mimeType, loaded.data), schema: ModelExtractionSchema, jsonSchema: EXTRACTION_JSON_SCHEMA as unknown as Record<string, unknown>, timeoutMs: limits.llmTimeoutMs },
-          { signal: deps.signal },
-        ),
-      );
-      stats.inputTokens += out.inputTokens ?? 0;
-      stats.outputTokens += out.outputTokens ?? 0;
-      usageFor(id).inputTokens += out.inputTokens ?? 0;
-      usageFor(id).outputTokens += out.outputTokens ?? 0;
-      applyModel(w, out.data.documents.find((d) => d.documentId === w.documentId) ?? out.data.documents[0], "the model did not return this document");
+      const key = contentKey(focus, w.input.restaurant.name, w.input.restaurant.address ?? "", w.candidate.documentKind, loaded.data);
+      const { doc, hit } = await modelCache.getOrRun(key, async () => {
+        committedInputTokens += VISION_INPUT_TOKENS;
+        stats.llmRequests++;
+        stats.visionRequests++;
+        usageFor(id).geminiRequests++;
+        usageFor(id).visionRequests++;
+        const out = await callModel("menu-extract-vision", () =>
+          deps.llm!.generateStructured(
+            { label: "menu-extract-vision", system, parts: buildVisionParts(promptDoc(w), loaded.mimeType, loaded.data), schema: ModelExtractionSchema, jsonSchema: EXTRACTION_JSON_SCHEMA as unknown as Record<string, unknown>, timeoutMs: limits.llmTimeoutMs, maxOutputTokens: limits.maxOutputTokens },
+            { signal: deps.signal },
+          ),
+        );
+        usageFor(id).inputTokens += out.inputTokens ?? 0;
+        usageFor(id).outputTokens += out.outputTokens ?? 0;
+        const found = out.data.documents.find((d) => d.documentId === w.documentId) ?? out.data.documents[0];
+        if (!found) throw new GeminiError("invalid_response", "The model did not return this document");
+        return found;
+      });
+      if (hit) stats.cacheHits++;
+      applyModel(w, { ...doc, documentId: w.documentId }, "the model did not return this document");
     } catch (err) {
       w.doc.status = "failed";
-      w.doc.reason = err instanceof GeminiError ? `model ${err.code}` : "model error";
+      w.doc.reason = failureReason(err);
       return;
     }
     if (deps.verifyImagePrices !== false && w.dishes.some((d) => d.prices.some((p) => p.amount !== undefined))) await crossCheckPrices(w, loaded);
@@ -379,8 +515,8 @@ export async function extractMenus(inputs: ExtractInput[], deps: ExtractDeps): P
 
   const crossCheckPrices = async (w: Work, loaded: Extract<LoadedDocument, { kind: "vision" }>): Promise<void> => {
     const id = w.input.restaurant.placeId;
-    if (!deps.llm || budgetLeft() < 1) {
-      for (const d of w.dishes) for (const p of d.prices) if (p.status === "unverified") w.doc.warnings.push("prices were not cross-checked");
+    if (!deps.llm || budgetLeft() < 1 || deps.llm.available?.() === false) {
+      w.doc.warnings.push("prices were not cross-checked");
       return;
     }
     stats.priceCheckRequests++;
@@ -389,14 +525,12 @@ export async function extractMenus(inputs: ExtractInput[], deps: ExtractDeps): P
     const names = w.dishes.filter((d) => relevant(d) && d.prices.some((p) => p.amount !== undefined)).map((d) => d.originalName).slice(0, 60);
     if (names.length === 0) return;
     try {
-      const out = await llmLimiter.run(() =>
+      const out = await callModel("menu-price-check", () =>
         deps.llm!.generateStructured(
-          { label: "menu-price-check", system: PRICE_CHECK_SYSTEM, parts: buildPriceCheckParts(loaded.mimeType, loaded.data, names), schema: PriceCheckSchema, jsonSchema: PRICE_CHECK_JSON_SCHEMA as unknown as Record<string, unknown>, models: deps.priceCheckModel ? [deps.priceCheckModel] : undefined, timeoutMs: limits.llmTimeoutMs },
+          { label: "menu-price-check", system: PRICE_CHECK_SYSTEM, parts: buildPriceCheckParts(loaded.mimeType, loaded.data, names), schema: PriceCheckSchema, jsonSchema: PRICE_CHECK_JSON_SCHEMA as unknown as Record<string, unknown>, models: deps.priceCheckModel ? [deps.priceCheckModel] : undefined, timeoutMs: limits.llmTimeoutMs, maxOutputTokens: limits.priceCheckMaxOutputTokens },
           { signal: deps.signal },
         ),
       );
-      stats.inputTokens += out.inputTokens ?? 0;
-      stats.outputTokens += out.outputTokens ?? 0;
       const second = new Map(out.data.lines.map((l) => [normalizeText(l.dish), l.price]));
       for (const d of w.dishes) {
         if (!names.includes(d.originalName)) continue;
@@ -405,10 +539,8 @@ export async function extractMenus(inputs: ExtractInput[], deps: ExtractDeps): P
         d.prices = d.prices.map((p) => {
           if (p.amount === undefined) return p;
           if (otherAmounts.length === 0) return p;
-          if (otherAmounts.includes(p.amount)) return { ...p, status: "ocr_agreed" as const };
-          const { amount: _hidden, ...rest } = p;
-          void _hidden;
-          return { ...rest, status: "disputed" as const };
+          if (otherAmounts.includes(p.amount)) return { ...p, status: "ocr_agreed" as const, basis: "image_agreed" as const, confidence: 0.85 };
+          return { ...p, status: "disputed" as const, basis: "image_conflict" as const, confidence: 0.3, alternateAmount: otherAmounts[0] };
         });
         if (d.prices.some((p) => p.status === "disputed")) d.extractionConfidence = Math.min(d.extractionConfidence, 0.4);
         else if (d.prices.some((p) => p.status === "ocr_agreed")) d.extractionConfidence = Math.max(d.extractionConfidence, 0.8);
@@ -419,7 +551,8 @@ export async function extractMenus(inputs: ExtractInput[], deps: ExtractDeps): P
   };
 
   // 4. run model jobs
-  await Promise.all([...batches.map((b) => runBatch(b)), ...visionWorks.map((w) => runVision(w))]);
+  await Promise.all([...jobs.map((j) => runJob(j)), ...visionWorks.map((w) => runVision(w))]);
+  for (const w of textWorks) finalizeText(w);
 
   // 5. assemble per restaurant
   const results: MenuExtraction[] = [];
@@ -450,7 +583,7 @@ export async function extractMenus(inputs: ExtractInput[], deps: ExtractDeps): P
       continue;
     }
 
-    const dishes = mergeDishes(mine.flatMap((w) => w.dishes)).slice(0, limits.maxDishesPerRestaurant);
+    const dishes = representativeDishes(mergeDishes(mine.flatMap((w) => w.dishes)), limits.maxDishesPerRestaurant);
     const setMenus = mine.flatMap((w) => w.setMenus);
     const good = docs.filter((d) => d.status === "extracted" || d.status === "partial");
     const problems = docs.filter((d) => d.status === "failed" || d.status === "empty" || d.status === "partial");

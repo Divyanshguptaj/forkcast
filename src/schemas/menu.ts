@@ -85,7 +85,7 @@ export const MenuItemSchema = z
     sourceUrl: httpUrl,
   })
   .superRefine((item, ctx) => {
-    const noNumber = item.priceStatus === "disputed" || item.priceStatus === "absent";
+    const noNumber = item.priceStatus === "absent";
     if (noNumber && item.price !== undefined) {
       ctx.addIssue({
         code: "custom",

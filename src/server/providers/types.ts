@@ -70,9 +70,11 @@ export interface LlmStructuredResult<T> {
   durationMs: number;
   inputTokens?: number;
   outputTokens?: number;
+  truncated?: boolean;
 }
 
 export interface LlmProvider {
+  available?(): boolean;
   generateStructured<T>(req: LlmStructuredRequest<T>, ctx?: CallContext): Promise<LlmStructuredResult<T>>;
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { GeminiClient, GeminiError, createGeminiClient } from "@/server/providers/gemini/client";
+import { QuotaBreaker } from "@/server/providers/gemini/quotaBreaker";
 import { loadEnv } from "@/config/env";
 
 const KEY = "AIzaSyFAKE-KEY-FOR-TESTS-1234567890";
@@ -12,7 +13,7 @@ const ok = (data: unknown, usage = { promptTokenCount: 100, candidatesTokenCount
 const fail = (status: number, body: unknown = { error: { status: "UNAVAILABLE" } }) => new Response(JSON.stringify(body), { status });
 const perDay = () => fail(429, { error: { status: "RESOURCE_EXHAUSTED", details: [{ violations: [{ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier" }] }] } });
 
-function client(responses: Array<Response | Error>, models = ["gemini-2.5-flash", "gemini-3.5-flash-lite"]) {
+function client(responses: Array<Response | Error>, models = ["gemini-2.5-flash", "gemini-3.5-flash-lite"], breaker = new QuotaBreaker()) {
   const queue = [...responses];
   const fetchImpl = vi.fn(async () => {
     const next = queue.shift();
@@ -21,8 +22,8 @@ function client(responses: Array<Response | Error>, models = ["gemini-2.5-flash"
     return next;
   });
   const sleeps: number[] = [];
-  const c = new GeminiClient({ apiKey: KEY, models, fetchImpl: fetchImpl as unknown as typeof fetch, sleep: async (ms) => void sleeps.push(ms) });
-  return { c, fetchImpl, sleeps };
+  const c = new GeminiClient({ apiKey: KEY, models, fetchImpl: fetchImpl as unknown as typeof fetch, sleep: async (ms) => void sleeps.push(ms), breaker });
+  return { c, fetchImpl, sleeps, breaker };
 }
 
 const bodyOf = (fetchImpl: ReturnType<typeof vi.fn>, n: number) => JSON.parse((fetchImpl.mock.calls[n][1] as RequestInit).body as string);
@@ -96,8 +97,76 @@ describe("GeminiClient", () => {
   it("reports unavailable when every model fails", async () => {
     const { c } = client([perDay(), perDay()]);
     const err = (await c.generateStructured(request).catch((e: unknown) => e)) as GeminiError;
-    expect(err.code).toBe("unavailable");
+    expect(err.code).toBe("quota_exhausted");
     expect(err.message).not.toContain(KEY);
+  });
+
+  it("reports unavailable (not quota) when models fail for transient reasons", async () => {
+    const { c } = client([fail(503), fail(503), fail(503), fail(503), fail(503), fail(503)]);
+    expect(await codeOf(c.generateStructured(request))).toBe("unavailable");
+  });
+
+  it("remembers an exhausted daily quota and makes no HTTP request for it again", async () => {
+    const { c, fetchImpl } = client([perDay(), ok({ answer: "a" }), ok({ answer: "b" })]);
+    await c.generateStructured(request);
+    await c.generateStructured(request);
+    const urls = (fetchImpl.mock.calls as unknown[][]).map((call) => String(call[0]));
+    expect(urls.filter((u) => u.includes("gemini-2.5-flash:"))).toHaveLength(1);
+    expect(urls.filter((u) => u.includes("gemini-3.5-flash-lite:"))).toHaveLength(2);
+    expect(c.stats.skippedByBreaker).toBe(1);
+    expect(c.available()).toBe(true);
+    expect(c.blockedModels()["gemini-2.5-flash"].reason).toBe("daily_quota");
+  });
+
+  it("fails immediately with quota_exhausted and zero requests once every model is exhausted", async () => {
+    const { c, fetchImpl } = client([perDay(), perDay()]);
+    expect(await codeOf(c.generateStructured(request))).toBe("quota_exhausted");
+    expect(c.available()).toBe(false);
+    const before = fetchImpl.mock.calls.length;
+    expect(await codeOf(c.generateStructured(request))).toBe("quota_exhausted");
+    expect(fetchImpl.mock.calls.length).toBe(before);
+  });
+
+  it("lets the daily-quota pause expire", async () => {
+    let now = 0;
+    const breaker = new QuotaBreaker(() => now);
+    const { c, fetchImpl } = client([perDay(), perDay(), ok({ answer: "later" })], undefined, breaker);
+    await codeOf(c.generateStructured(request));
+    now = 61 * 60_000;
+    expect((await c.generateStructured(request)).data.answer).toBe("later");
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it("honours a Retry-After header on a per-minute 429", async () => {
+    const limited = new Response("{}", { status: 429, headers: { "retry-after": "3" } });
+    const { c, sleeps } = client([limited, ok({ answer: "ok" })]);
+    await c.generateStructured(request);
+    expect(sleeps).toEqual([3000]);
+  });
+
+  it("honours the RetryInfo delay in the error body", async () => {
+    const body = { error: { status: "RESOURCE_EXHAUSTED", details: [{ "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: "2s" }] } };
+    const { c, sleeps } = client([fail(429, body), ok({ answer: "ok" })]);
+    await c.generateStructured(request);
+    expect(sleeps).toEqual([2000]);
+  });
+
+  it("does not wait out a long retry delay; it pauses that model and uses the next", async () => {
+    const body = { error: { status: "RESOURCE_EXHAUSTED", details: [{ "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: "45s" }] } };
+    const { c, sleeps, breaker } = client([fail(429, body), ok({ answer: "next" })]);
+    expect((await c.generateStructured(request)).model).toBe("gemini-3.5-flash-lite");
+    expect(sleeps).toEqual([]);
+    expect(breaker.blocked("gemini-2.5-flash")?.reason).toBe("rate_limit");
+    expect(breaker.blocked("gemini-2.5-flash")?.remainingMs).toBeGreaterThanOrEqual(44_000);
+  });
+
+  it("pauses a model briefly after its retries are exhausted so concurrent callers skip it", async () => {
+    const { c, fetchImpl } = client([fail(503), fail(503), fail(503), ok({ answer: "x" }), ok({ answer: "y" })]);
+    await c.generateStructured(request);
+    await c.generateStructured(request);
+    const urls = (fetchImpl.mock.calls as unknown[][]).map((call) => String(call[0]));
+    expect(urls.filter((u) => u.includes("gemini-2.5-flash:"))).toHaveLength(3);
+    expect(urls.filter((u) => u.includes("gemini-3.5-flash-lite:"))).toHaveLength(2);
   });
 
   it("rejects malformed model output", async () => {
@@ -127,5 +196,21 @@ describe("GeminiClient", () => {
   it("requires a key and builds from the environment", () => {
     expect(() => createGeminiClient(loadEnv({}))).toThrow(/not configured/);
     expect(createGeminiClient(loadEnv({ GEMINI_API_KEY: KEY }))).toBeInstanceOf(GeminiClient);
+  });
+});
+
+describe("GeminiClient warm-up gate", () => {
+  it("sends one request first to an unproven model so concurrent callers do not repeat a daily-quota 429", async () => {
+    const urls: string[] = [];
+    const fetchImpl = vi.fn(async (url: unknown) => {
+      urls.push(String(url));
+      await new Promise((r) => setTimeout(r, 20));
+      return String(url).includes("gemini-2.5-flash:") ? perDay() : ok({ answer: "x" });
+    });
+    const c = new GeminiClient({ apiKey: KEY, models: ["gemini-2.5-flash", "gemini-3.5-flash-lite"], fetchImpl: fetchImpl as unknown as typeof fetch, breaker: new QuotaBreaker() });
+    const results = await Promise.all([1, 2, 3, 4, 5, 6].map(() => c.generateStructured(request)));
+    expect(results.every((r) => r.model === "gemini-3.5-flash-lite")).toBe(true);
+    expect(urls.filter((u) => u.includes("gemini-2.5-flash:"))).toHaveLength(1);
+    expect(urls.filter((u) => u.includes("gemini-3.5-flash-lite:"))).toHaveLength(6);
   });
 });

@@ -133,7 +133,7 @@ describe("scanned PDFs and images (vision)", () => {
     expect(mozzarella.diet.vegetarian).toMatchObject({ status: "confirmed", basis: "menu_label" });
   });
 
-  it("hides prices that the second read disputes and keeps the dish", async () => {
+  it("keeps a price the second read disputes as disputed, with both readings and provenance", async () => {
     const r = restaurant();
     const { deps } = setup({ [URL("carta.png")]: { body: PNG_BYTES } }, (req) => {
       if (req.label === "menu-price-check") return { lines: [{ dish: "Pa amb tomàquet", price: "14,50" }, { dish: "Truita de patates", price: "7,20" }, { dish: "Amanida de mozzarella (V)", price: null }] };
@@ -141,8 +141,8 @@ describe("scanned PDFs and images (vision)", () => {
     });
     const { results } = await run([{ restaurant: r, resolution: resolved(r, [cand({ url: URL("carta.png"), mediaType: "image" })]) }], deps);
     const byName = Object.fromEntries(results[0].dishes.map((d) => [d.originalName, d.prices[0]]));
-    expect(byName["Pa amb tomàquet"]).toEqual({ status: "disputed", currency: "EUR", raw: "4,50" });
-    expect(byName["Pa amb tomàquet"].amount).toBeUndefined();
+    expect(byName["Pa amb tomàquet"]).toMatchObject({ status: "disputed", currency: "EUR", raw: "4,50", amount: 4.5, alternateAmount: 14.5, basis: "image_conflict", confidence: 0.3 });
+    expect(byName["Truita de patates"]).toMatchObject({ basis: "image_agreed" });
     expect(byName["Truita de patates"]).toMatchObject({ amount: 7.2, status: "ocr_agreed" });
     expect(byName["Amanida de mozzarella (V)"]).toMatchObject({ amount: 10.7, status: "unverified" });
     expect(results[0].dishes.find((d) => d.originalName === "Pa amb tomàquet")!.extractionConfidence).toBeLessThanOrEqual(0.4);
@@ -158,7 +158,7 @@ describe("scanned PDFs and images (vision)", () => {
   it("skips scanned PDFs that are too long and limits vision documents per restaurant", async () => {
     const r = restaurant();
     const many = Array.from({ length: 3 }, (_, i) => cand({ id: `r1#c${i + 1}`, url: URL(`c${i}.png`), mediaType: "image" }));
-    const routes = Object.fromEntries(many.map((c) => [c.url, { body: PNG_BYTES }]));
+    const routes = Object.fromEntries(many.map((c, i) => [c.url, { body: new Uint8Array([...PNG_BYTES, i]) }]));
     const { llm, deps } = setup(routes, (req) => ({ documents: [modelDoc((req as unknown as { parts: Array<{ text?: string }> }).parts[0].text!.match(/documentId "([^"]+)"/)![1], [dish("Pa amb tomàquet")], {})] }), { limits: { maxVisionDocsPerRestaurant: 2, maxDocsPerRestaurant: 4, maxDocsTotal: 10 }, verifyImagePrices: false });
     const { results } = await run([{ restaurant: r, resolution: resolved(r, many) }], deps);
     expect(llm.calls).toHaveLength(2);

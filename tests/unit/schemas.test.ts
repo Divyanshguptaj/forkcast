@@ -157,9 +157,10 @@ describe("MenuItem prices", () => {
     expect(r.success).toBe(true);
   });
 
-  it("hides disputed prices", () => {
-    expect(MenuItemSchema.safeParse(item({ priceStatus: "disputed" })).success).toBe(false);
-    expect(MenuItemSchema.safeParse(item({ price: undefined, priceStatus: "disputed" })).success).toBe(true);
+  it("keeps a disputed price visible but requires a number for it", () => {
+    expect(MenuItemSchema.safeParse(item({ priceStatus: "disputed" })).success).toBe(true);
+    expect(MenuItemSchema.safeParse(item({ price: undefined, priceStatus: "disputed" })).success).toBe(false);
+    expect(MenuItemSchema.safeParse(item({ priceStatus: "absent" })).success).toBe(false);
   });
 
   it("rejects absent price status with a number and priced status without one", () => {
@@ -199,7 +200,7 @@ describe("MenuDocument", () => {
         readQuality: "poor",
         confidence: 0.3,
         imageCount: 2,
-        items: [item({ price: undefined, priceStatus: "disputed", extractionConfidence: 0.4 })],
+        items: [item({ priceStatus: "disputed", extractionConfidence: 0.4 })],
       }),
     );
     expect(d.success).toBe(true);

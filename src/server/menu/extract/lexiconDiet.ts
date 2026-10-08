@@ -39,7 +39,7 @@ const GLUTEN = [
   "noodles", "dumpling", "gyoza", "gyozas", "tiramisu", "coulant", "brownie", "bunyols",
 ];
 
-const VEG_LABELS = /(?:^|[\s(\[])(?:\(v\)|\(v(?:\s*[,/]\s*[a-z]{1,3})+\)|\(ve\)|\(vg\)|\[v\]|vegetarian[oa]?s?|vegetarià|vegetaria|veggie|vegan[oa]?s?|plant[- ]based|100\s?%\s?vegetal)(?=$|[\s)\].,;:])/i;
+const VEG_LABELS = /(?:^|[\s(\[])(?:\(v\)|\(v(?:\s*[,/]\s*[a-z]{1,3})+\)|\(ve\)|\(vg\)|\(veg\)|\[v\]|vegetarian[oa]?s?|vegetarià|vegetaria|veggie|vegan[oa]?s?|plant[- ]based|100\s?%\s?vegetal)(?=$|[\s)\].,;:])/i;
 const VEGAN_LABELS = /(?:^|[\s(\[])(?:\(ve\)|\(vg\)|vegan[oa]?s?|plant[- ]based|100\s?%\s?vegetal)(?=$|[\s)\].,;:])/i;
 const GF_LABELS = /(?:^|[\s(\[])(?:sin gluten|sense gluten|gluten[- ]free|\(sg\)|\(gf\)|apto celiacos|per a cel[·.]?l[ií]acs)(?=$|[\s)\].,;:])/i;
 

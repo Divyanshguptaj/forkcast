@@ -47,13 +47,20 @@ function priceKey(p: DishPrice): string {
   return `${collapse(p.label ?? "")}|${p.amount ?? "none"}|${p.currency}`;
 }
 
+const PRICE_STRENGTH: Record<DishPrice["status"], number> = { verified: 4, ocr_agreed: 3, unverified: 2, disputed: 1, absent: 0 };
+
 function mergePrices(a: DishPrice[], b: DishPrice[]): { prices: DishPrice[]; conflict: boolean } {
   const withAmount = (list: DishPrice[]) => list.filter((p) => p.amount !== undefined);
   const known = new Map<string, DishPrice>();
   for (const p of [...withAmount(a), ...withAmount(b)]) {
     const key = priceKey(p);
     const existing = known.get(key);
-    if (!existing || (existing.status !== "verified" && p.status === "verified")) known.set(key, p);
+    if (!existing || PRICE_STRENGTH[p.status] > PRICE_STRENGTH[existing.status]) known.set(key, p);
+  }
+  for (const [key, p] of [...known]) {
+    const label = collapse(p.label ?? "");
+    const supersededBy = [...known.values()].some((o) => o !== p && collapse(o.label ?? "") === label && (o.status === "verified" || o.status === "ocr_agreed") && p.status === "disputed");
+    if (supersededBy) known.delete(key);
   }
   if (known.size === 0) return { prices: [{ status: "absent", currency: "EUR" }], conflict: false };
   const labels = new Map<string, Set<number>>();

@@ -13,7 +13,8 @@
     "test:e2e": "playwright test",
     "phase2": "node --env-file=.env.local --import tsx src/dev/phase2.ts",
     "phase4": "node --env-file=.env.local --import tsx src/dev/phase4.ts",
-    "phase5": "node --env-file=.env.local --import tsx src/dev/phase5.ts"
+    "phase5": "node --env-file=.env.local --import tsx src/dev/phase5.ts",
+    "phase6": "node --env-file=.env.local --import tsx src/dev/phase6.ts"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

@@ -215,6 +215,8 @@ function handleEvent(state: RunState, event: AgentEvent): RunState {
     }
     case "rank.done":
       return { ...state, rankDone: true, stages: setStage(setStage(finishEarlier(state.stages, "compare"), "compare", "done"), "ready", "active") };
+    case "recommendations.ready":
+      return { ...state, recommendations: event.payload, stages: setStage(setStage(finishEarlier(state.stages, "compare"), "compare", "done"), "ready", "active") };
     case "explain.done":
       return { ...state, explainDone: true, stages: setStage(finishEarlier(state.stages, "ready"), "ready", "done") };
     case "result":

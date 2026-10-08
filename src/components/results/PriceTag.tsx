@@ -13,8 +13,9 @@ const formatter = new Intl.NumberFormat("en-IE", { style: "currency", currency: 
 export function PriceTag({ price, status, className }: Props) {
   if (status === "disputed") {
     return (
-      <span className={cx("tabular inline-flex items-center gap-1.5 text-sm text-muted", className)} title="The price on the photo was hard to read, so Forkcast hides it.">
-        € -- <span className="font-sans text-xs font-semibold text-chili">Price unclear</span>
+      <span className={cx("tabular inline-flex items-center gap-1.5 text-sm text-muted", className)} title="Two readings of the menu photo disagreed, so this price is not confirmed.">
+        {price !== undefined ? <span aria-label={`Disputed price ${formatter.format(price)}`}>~{formatter.format(price)}</span> : "€ --"}
+        <span className="font-sans text-xs font-semibold text-chili">{price !== undefined ? "Price disputed" : "Price unclear"}</span>
       </span>
     );
   }

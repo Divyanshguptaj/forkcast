@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SourceTier } from "./common";
 import { RecommendationResponseSchema } from "./recommendation";
+import { RecommendationSetSchema } from "./recommendations";
 import { MenuFormat, MenuItemPreviewSchema, MenuStage } from "./menu";
 import { UserRequestSchema } from "./request";
 
@@ -112,6 +113,7 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     label: z.string().max(160),
   }),
   z.object({ ...base, type: z.literal("rank.done") }),
+  z.object({ ...base, type: z.literal("recommendations.ready"), payload: RecommendationSetSchema }),
   z.object({ ...base, type: z.literal("explain.done") }),
   z.object({ ...base, type: z.literal("result"), payload: RecommendationResponseSchema }),
   z.object({

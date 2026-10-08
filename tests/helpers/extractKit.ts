@@ -36,14 +36,19 @@ export function resolved(restaurant: ResolverRestaurant, selected: CandidateSumm
 }
 
 export interface FakeLlm extends LlmProvider {
-  calls: Array<{ label: string; parts: LlmStructuredRequest<unknown>["parts"]; system: string; models?: string[] }>;
+  calls: Array<{ label: string; parts: LlmStructuredRequest<unknown>["parts"]; system: string; models?: string[]; maxOutputTokens?: number }>;
+  exhausted: boolean;
 }
 
 export function fakeLlm(handler: (req: LlmStructuredRequest<unknown>, call: number) => unknown): FakeLlm {
   const llm: FakeLlm = {
     calls: [],
+    exhausted: false,
+    available() {
+      return !llm.exhausted;
+    },
     async generateStructured<T>(req: LlmStructuredRequest<T>) {
-      llm.calls.push({ label: req.label, parts: req.parts, system: req.system, models: req.models });
+      llm.calls.push({ label: req.label, parts: req.parts, system: req.system, models: req.models, maxOutputTokens: req.maxOutputTokens });
       const raw = handler(req as LlmStructuredRequest<unknown>, llm.calls.length);
       if (raw instanceof Error) throw raw;
       return { data: req.schema.parse(raw), model: "fake", durationMs: 1, inputTokens: 1000, outputTokens: 200 };

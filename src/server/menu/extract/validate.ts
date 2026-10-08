@@ -58,11 +58,15 @@ export interface BuildResult {
   warnings: string[];
 }
 
-function priceStatusForSource(source: SourceDoc, sourceNorm: string | undefined, name: string, amount: number): { status: DishPrice["status"]; keep: boolean } {
-  if (source.method === "vision" || !sourceNorm || !source.text) return { status: "unverified", keep: true };
+type PriceReading = { status: DishPrice["status"]; basis: NonNullable<DishPrice["basis"]>; confidence: number; keep: boolean };
+
+function priceStatusForSource(source: SourceDoc, sourceNorm: string | undefined, name: string, amount: number): PriceReading {
+  if (source.method === "vision" || !sourceNorm || !source.text) return { status: "unverified", basis: "image_single_read", confidence: 0.5, keep: true };
   const check = checkPriceInSource(source.text, name, amount);
-  if (check === "not_found") return { status: "absent", keep: false };
-  return { status: check === "verified" ? "verified" : "unverified", keep: true };
+  if (check === "not_found") return { status: "absent", basis: "text_elsewhere", confidence: 0, keep: false };
+  return check === "verified"
+    ? { status: "verified", basis: "text_adjacent", confidence: 0.9, keep: true }
+    : { status: "unverified", basis: "text_elsewhere", confidence: 0.5, keep: true };
 }
 
 export function buildPrices(raw: string | undefined, source: SourceDoc, sourceNorm: string | undefined, name: string, warnings: string[]): DishPrice[] {
@@ -71,12 +75,12 @@ export function buildPrices(raw: string | undefined, source: SourceDoc, sourceNo
   if (parsed.length === 0) return [{ status: "absent", currency: "EUR" }];
   const prices: DishPrice[] = [];
   for (const p of parsed) {
-    const { status, keep } = priceStatusForSource(source, sourceNorm, name, p.amount);
+    const { status, basis, confidence, keep } = priceStatusForSource(source, sourceNorm, name, p.amount);
     if (!keep) {
       warnings.push(`Price ${p.raw} for "${name}" is not in the source text; ignored`);
       continue;
     }
-    prices.push({ ...(p.label ? { label: p.label.slice(0, 60) } : {}), amount: p.amount, currency: p.currency, raw: p.raw.slice(0, 40), status });
+    prices.push({ ...(p.label ? { label: p.label.slice(0, 60) } : {}), amount: p.amount, currency: p.currency, raw: p.raw.slice(0, 40), status, basis, confidence });
   }
   return prices.length ? prices : [{ status: "absent", currency: "EUR" }];
 }

@@ -50,7 +50,7 @@ const CREDIBILITY_LOG_SCALE = 3.5;
 const DISTANCE_FULL_KM = 1;
 const DISTANCE_ZERO_KM = 8;
 
-const PRICE_LEVEL_EUR: Record<number, { entry: number; typical: number }> = {
+export const PRICE_LEVEL_EUR: Record<number, { entry: number; typical: number }> = {
   0: { entry: 0, typical: 5 },
   1: { entry: 5, typical: 12 },
   2: { entry: 12, typical: 25 },

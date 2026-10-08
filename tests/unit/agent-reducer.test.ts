@@ -29,6 +29,20 @@ describe("replay fixtures use the real AgentEvent contract", () => {
   });
 });
 
+describe("recommendations.ready", () => {
+  it("is stored once and moves the run to its final stages", () => {
+    const state = reduceAll(events("recorded"));
+    expect(state.recommendations?.outcome).toBe("exact_matches");
+    expect(state.stages.ready).toBe("done");
+    expect(state.rankDone).toBe(true);
+    expect(reduceAll(events("recorded-no-exact")).recommendations?.outcome).toBe("alternatives_only");
+  });
+
+  it("is absent for runs that never reached ranking", () => {
+    expect(reduceAll(events("timeout")).recommendations).toBeUndefined();
+  });
+});
+
 describe("Phase 2 events", () => {
   const state = reduceAll(events("phase2"));
 

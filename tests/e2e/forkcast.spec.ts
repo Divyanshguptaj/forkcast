@@ -123,6 +123,46 @@ test.describe("research replay", () => {
   });
 });
 
+test.describe("recommendation results", () => {
+  test("ranks real recorded menus with dishes, verified prices, evidence and sources", async ({ page }, info) => {
+    await page.goto("/?scenario=recorded&speed=0");
+    await page.getByRole("button", { name: /Find my table/ }).click();
+    await expect(page.getByRole("heading", { name: /Your best matches/ })).toBeVisible();
+    const cards = page.getByTestId("recommendation-card");
+    await expect(cards).toHaveCount(4);
+    await expect(cards.first()).toContainText("Trattoria Marina");
+    await expect(cards.first()).toContainText("Matches everything");
+    await expect(cards.first()).toContainText("VEGETARIANA");
+    await expect(cards.first()).toContainText("€14.50");
+    await expect(page.locator('[data-tier="uncertain"]')).toContainText("group booking");
+    await expect(page.getByTestId("excluded-list")).toContainText("Elio's");
+    await expect(page.getByText("Design preview with invented data")).toHaveCount(0);
+    await noHorizontalOverflow(page);
+    await page.getByTestId("recommendation-results").screenshot({ path: `${SHOT_DIR}/recommendations-${info.project.name}.png` });
+    await cards.first().screenshot({ path: `${SHOT_DIR}/recommendation-card-${info.project.name}.png` });
+  });
+
+  test("labels the closest options when nothing matches exactly", async ({ page }) => {
+    await page.goto("/?scenario=recorded-no-exact&speed=0");
+    await page.getByRole("button", { name: /Find my table/ }).click();
+    await expect(page.getByRole("heading", { name: /No exact match/ })).toBeVisible();
+    await expect(page.getByText("No restaurant satisfied every requirement")).toBeVisible();
+    await expect(page.locator('[data-tier="exact"]')).toHaveCount(0);
+    await expect(page.getByTestId("recommendation-card").first()).toContainText("Doesn't match");
+    await noHorizontalOverflow(page);
+  });
+
+  test("results have no critical accessibility violations", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/?scenario=recorded&speed=0");
+    await page.getByRole("button", { name: /Find my table/ }).click();
+    await expect(page.getByRole("heading", { name: /Your best matches/ })).toBeVisible();
+    await page.getByText("What we checked").first().click();
+    await page.getByText(/How the score/).first().click();
+    expect(await axeViolations(page)).toEqual([]);
+  });
+});
+
 test("design gallery renders every notice and has no critical accessibility violations", async ({ page }, info) => {
   await page.goto("/dev/gallery");
   await expect(page.getByRole("heading", { name: "Forkcast design gallery" })).toBeVisible();
