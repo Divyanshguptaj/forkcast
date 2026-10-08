@@ -2,7 +2,7 @@ import type { Source } from "@/schemas/common";
 import type { RecommendRequestBodyType } from "@/schemas/request";
 import type { EventEmitter } from "../agent/events";
 import type { PlacesProvider } from "../providers/types";
-import { PlacesError } from "../providers/places/errors";
+import { describeFailure } from "../agent/failure";
 import { discoverRestaurants, type DiscoveredRestaurant, type PlacesCallRecord } from "./discover";
 import { filterCandidates, type ExcludedCandidate } from "./filter";
 import { normalizeRequest, type NormalizedRequest } from "./normalizeRequest";
@@ -82,9 +82,8 @@ export async function runDiscovery(body: RecommendRequestBodyType, deps: Discove
       durationMs: Date.now() - started,
     };
   } catch (err) {
-    const code = err instanceof PlacesError ? `places_${err.code}` : err instanceof Error ? err.name : "unknown";
-    const message = err instanceof Error ? err.message.slice(0, 300) : "Discovery failed";
-    emitter.emit({ type: "error", code, message, recoverable: err instanceof PlacesError && err.code === "rate_limited" });
+    const info = describeFailure(err);
+    emitter.emit({ type: "error", ...info });
     throw err;
   }
 }

@@ -25,9 +25,16 @@ export function restaurantPhase(r: RestaurantResearch): RestaurantPhase {
   return "researching";
 }
 
-export type RunNoticeKind = "no_results" | "places_unavailable" | "agent_timeout" | "partial_results" | "unexpected_error";
+export type RunNoticeKind = "no_results" | "places_unavailable" | "agent_timeout" | "partial_results" | "unexpected_error" | "request_problem" | "rate_limited" | "service_unavailable";
 
-export function errorKind(code: string): "places_unavailable" | "timeout" | "unknown" {
+const REQUEST_CODES = new Set(["invalid_request", "invalid_json", "conflicting_request", "unsupported_city", "payload_too_large", "unsupported_media_type"]);
+const RATE_CODES = new Set(["rate_limited", "already_running", "busy"]);
+const SERVICE_CODES = new Set(["not_configured", "network", "incomplete"]);
+
+export function errorKind(code: string): "places_unavailable" | "timeout" | "request_problem" | "rate_limited" | "service_unavailable" | "unknown" {
+  if (REQUEST_CODES.has(code)) return "request_problem";
+  if (RATE_CODES.has(code)) return "rate_limited";
+  if (SERVICE_CODES.has(code) || /^http_5/.test(code)) return "service_unavailable";
   if (code.startsWith("places_")) return "places_unavailable";
   if (code === "deadline" || code === "timeout" || code.endsWith("_timeout")) return "timeout";
   return "unknown";
@@ -38,6 +45,7 @@ export function runNotice(state: RunState): RunNoticeKind | undefined {
   if (state.status !== "error" || !state.error) return undefined;
   const kind = errorKind(state.error.code);
   const hasShortlist = state.shortlistOrder.length > 0;
+  if (kind === "request_problem" || kind === "rate_limited" || kind === "service_unavailable") return kind;
   if (kind === "timeout") return hasShortlist ? "partial_results" : "agent_timeout";
   if (kind === "places_unavailable") return "places_unavailable";
   return hasShortlist ? "partial_results" : "unexpected_error";

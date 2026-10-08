@@ -15,21 +15,25 @@ import { ToolActivityStrip } from "./ToolActivityBadge";
 interface Props {
   state: RunState;
   mockedStages?: boolean;
+  live?: boolean;
+  pending?: boolean;
+  resultsFirst?: boolean;
   onEdit?(): void;
   onRetry?(): void;
+  onCancel?(): void;
   children?: ReactNode;
 }
 
-export function AgentResearchView({ state, mockedStages = false, onEdit, onRetry, children }: Props) {
+export function AgentResearchView({ state, mockedStages = false, live = false, pending = false, resultsFirst = false, onEdit, onRetry, onCancel, children }: Props) {
   const notice = runNotice(state);
   const views = stageViews(state);
   const active = views.find((v) => state.stages[v.id] === "active");
-  const running = state.status === "running";
-  const shortlistOnly = state.ended && state.shortlistOrder.length > 0 && !hasResearchEvents(state) && !notice;
+  const running = state.status === "running" || pending;
+  const shortlistOnly = !live && state.ended && state.shortlistOrder.length > 0 && !hasResearchEvents(state) && !notice;
 
   const actions = (
     <>
-      {onRetry ? <Button onClick={onRetry} size="sm">Try again</Button> : null}
+      {onRetry && notice !== "request_problem" ? <Button onClick={onRetry} size="sm">Try again</Button> : null}
       {onEdit ? <Button onClick={onEdit} size="sm" variant="secondary">Edit search</Button> : null}
     </>
   );
@@ -45,7 +49,11 @@ export function AgentResearchView({ state, mockedStages = false, onEdit, onRetry
             </span>
           ))}
         </p>
-        {onEdit ? (
+        {live && running && onCancel ? (
+          <Button onClick={onCancel} size="sm" variant="secondary">
+            Cancel search
+          </Button>
+        ) : onEdit ? (
           <Button onClick={onEdit} size="sm" variant="ghost">
             Edit search
           </Button>
@@ -68,27 +76,51 @@ export function AgentResearchView({ state, mockedStages = false, onEdit, onRetry
         </aside>
 
         <div className="min-w-0 space-y-6">
-          <p className="flex flex-wrap items-center gap-2 rounded-control border-2 border-dashed border-saffron/60 px-3 py-2 text-sm text-muted">
-            <DemoSticker />
-            {mockedStages
-              ? "Replay of a recorded Barcelona run. Discovery events are real; menu and diner research below is simulated."
-              : "Replay of a recorded discovery run. Nothing is being searched right now."}
-          </p>
+          {live ? null : (
+            <p className="flex flex-wrap items-center gap-2 rounded-control border-2 border-dashed border-saffron/60 px-3 py-2 text-sm text-muted">
+              <DemoSticker />
+              {mockedStages
+                ? "Replay of a recorded Barcelona run. Discovery events are real; menu and diner research below is simulated."
+                : "Replay of a recorded run. Nothing is being searched right now."}
+            </p>
+          )}
 
-          {notice ? <StatusNotice kind={notice} actions={actions} /> : null}
-
-          {state.discoveredCount ? <DiscoveryFunnel discovered={state.discoveredCount} shortlisted={state.shortlistOrder.length} /> : null}
-          <ToolActivityStrip tools={state.tools} running={running} />
-          <ShortlistBoard state={state} mocked={mockedStages} />
-
-          {shortlistOnly ? (
-            <p className="rounded-card border-2 border-dashed border-line p-4 text-sm text-muted">
-              <span aria-hidden="true">🚧 </span>
-              Discovery is complete. Menu reading and diner research arrive in the next release, so these places are still candidates.
+          {pending ? (
+            <p role="status" className="rounded-control border-2 border-line bg-surface px-3 py-2 text-sm text-muted">
+              <span aria-hidden="true">⏳ </span>Starting your search…
             </p>
           ) : null}
 
-          {children}
+          {notice ? <StatusNotice kind={notice} actions={actions} body={live && (notice === "request_problem" || notice === "rate_limited" || notice === "service_unavailable") ? state.error?.message : undefined} /> : null}
+
+          {resultsFirst ? children : null}
+
+          {resultsFirst ? (
+            <details className="rounded-card border-2 border-dashed border-line bg-surface/70 p-4" data-testid="research-details">
+              <summary className="cursor-pointer list-none font-semibold text-muted hover:text-ink">
+                <span className="underline decoration-line underline-offset-4">How we researched these {state.shortlistOrder.length} restaurants</span>
+              </summary>
+              <div className="mt-4 space-y-6">
+                {state.discoveredCount ? <DiscoveryFunnel discovered={state.discoveredCount} shortlisted={state.shortlistOrder.length} /> : null}
+                <ShortlistBoard state={state} mocked={mockedStages} />
+              </div>
+            </details>
+          ) : (
+            <>
+              {state.discoveredCount ? <DiscoveryFunnel discovered={state.discoveredCount} shortlisted={state.shortlistOrder.length} /> : null}
+              {live ? null : <ToolActivityStrip tools={state.tools} running={running} />}
+              <ShortlistBoard state={state} mocked={mockedStages} />
+
+              {shortlistOnly ? (
+                <p className="rounded-card border-2 border-dashed border-line p-4 text-sm text-muted">
+                  <span aria-hidden="true">🚧 </span>
+                  Discovery is complete. Menu reading and diner research arrive in the next release, so these places are still candidates.
+                </p>
+              ) : null}
+
+              {children}
+            </>
+          )}
         </div>
       </div>
     </div>

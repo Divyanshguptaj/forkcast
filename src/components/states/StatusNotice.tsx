@@ -7,6 +7,9 @@ export type NoticeKind =
   | "agent_timeout"
   | "partial_results"
   | "unexpected_error"
+  | "request_problem"
+  | "rate_limited"
+  | "service_unavailable"
   | "menu_unavailable"
   | "menu_unreadable"
   | "menu_low_confidence"
@@ -51,6 +54,24 @@ export const NOTICE_COPY: Record<NoticeKind, NoticeCopy> = {
     emoji: "🫠",
     title: "Something went sideways",
     body: "We hit an unexpected problem. Your search wasn't lost. Try again.",
+    tone: "problem",
+  },
+  request_problem: {
+    emoji: "✍️",
+    title: "We couldn't use that request",
+    body: "Tell Forkcast what you are looking for, or pick a few filters, then try again.",
+    tone: "warn",
+  },
+  rate_limited: {
+    emoji: "🚦",
+    title: "Please slow down a little",
+    body: "Too many searches in a short time. Wait a moment and try again.",
+    tone: "warn",
+  },
+  service_unavailable: {
+    emoji: "🔌",
+    title: "Forkcast can't be reached",
+    body: "The service isn't available right now. Check your connection and try again in a moment.",
     tone: "problem",
   },
   menu_unavailable: {

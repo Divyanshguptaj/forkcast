@@ -25,7 +25,7 @@ export function buildConstraints(request: UserRequest, cuisines: string[] = requ
   for (const allergy of request.allergies) add({ id: `allergy:${slug(allergy)}`, kind: "allergy", strength: "hard", label: `Allergy: ${allergy}`, value: allergy, blocking: false });
   for (const food of request.dislikedFoods) add({ id: `dislike:${slug(food)}`, kind: "dislike", strength: "hard", label: `No ${food}`, value: food, blocking: false });
   if (request.budget) {
-    add({ id: "budget:max", kind: "budget", strength: "hard", label: `Up to €${request.budget.max} per person`, value: String(request.budget.max), blocking: true });
+    add({ id: "budget:max", kind: "budget", strength: "hard", label: `Up to €${request.budget.max} per person (checked per dish)`, value: String(request.budget.max), blocking: true });
   }
   for (const text of request.mustHave) add({ id: `must:${slug(text)}`, kind: "must_have", strength: "hard", label: `Must have: ${text}`, value: text, blocking: true });
   for (const cuisine of cuisines) add({ id: `cuisine:${slug(cuisine)}`, kind: "cuisine", strength: "soft", label: `${cuisine.charAt(0).toUpperCase()}${cuisine.slice(1)} cuisine`, value: cuisine, blocking: false });

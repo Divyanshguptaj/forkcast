@@ -104,6 +104,15 @@ export function RestaurantMatchCard({ r, headingLevel = 3 }: { r: MatchedRestaur
         </div>
       </header>
 
+      {r.allergyWarning ? (
+        <p role="note" className="mt-4 flex gap-2 rounded-control border-2 border-saffron/70 bg-saffron/10 px-3 py-2 text-sm text-ink">
+          <span aria-hidden="true">⚠️</span>
+          <span>
+            <strong>Allergy warning.</strong> {r.allergyWarning}
+          </span>
+        </p>
+      ) : null}
+
       <div className="mt-5 space-y-6">
         {r.reasons.length > 0 ? (
           <Section title={r.tier === "exact" ? "Why it matches" : "What we found"}>

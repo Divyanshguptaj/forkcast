@@ -57,7 +57,7 @@ export function stageViews(state: RunState): StageView[] {
       id: "research",
       emoji: "🍽️",
       short: "Research",
-      title: s.research === "done" ? "Research finished" : "Researching menus and diners",
+      title: s.research === "done" ? "Research finished" : "Checking menus and reading dishes",
       detail:
         s.research === "pending" && s.shortlist === "done"
           ? "Waiting for menu research"

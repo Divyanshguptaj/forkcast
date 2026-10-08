@@ -11,6 +11,23 @@ const base = {
   ts: z.iso.datetime(),
 };
 
+export const RunMetricsSchema = z.object({
+  totalMs: z.number().min(0),
+  understandAndDiscoverMs: z.number().min(0),
+  researchMs: z.number().min(0),
+  rankMs: z.number().min(0),
+  placesCalls: z.number().int().min(0),
+  tavilyCredits: z.number().min(0),
+  aiRequests: z.number().int().min(0),
+  inputTokens: z.number().int().min(0),
+  outputTokens: z.number().int().min(0),
+  cacheHits: z.number().int().min(0),
+  estimatedCostUsd: z.number().min(0),
+  partial: z.boolean(),
+});
+
+export type RunMetricsPublic = z.infer<typeof RunMetricsSchema>;
+
 export const RestaurantStep = z.enum(["details", "menu", "translate", "diet", "reviews"]);
 export const StepStatus = z.enum(["started", "progress", "done", "warning", "failed"]);
 export const ToolName = z.enum(["places", "web_search", "web_extract", "fetch", "gemini", "vision"]);
@@ -113,6 +130,7 @@ export const AgentEventSchema = z.discriminatedUnion("type", [
     label: z.string().max(160),
   }),
   z.object({ ...base, type: z.literal("rank.done") }),
+  z.object({ ...base, type: z.literal("run.metrics"), metrics: RunMetricsSchema }),
   z.object({ ...base, type: z.literal("recommendations.ready"), payload: RecommendationSetSchema }),
   z.object({ ...base, type: z.literal("explain.done") }),
   z.object({ ...base, type: z.literal("result"), payload: RecommendationResponseSchema }),

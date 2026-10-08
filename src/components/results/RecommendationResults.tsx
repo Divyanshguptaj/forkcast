@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
+import type { RunMetricsPublic } from "@/schemas/events";
 import type { MatchedRestaurant, RecommendationSet } from "@/schemas/recommendations";
 import { RestaurantMatchCard } from "./RestaurantMatchCard";
 
@@ -28,7 +29,36 @@ const HEADING: Record<RecommendationSet["outcome"], string> = {
   none: "😕 Nothing we can recommend yet",
 };
 
-export function RecommendationResults({ set }: { set: RecommendationSet }) {
+const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} s`;
+
+function RunSummary({ m }: { m: RunMetricsPublic }) {
+  return (
+    <details className="rounded-card border-2 border-dashed border-line bg-surface/70 p-4 text-sm" data-testid="run-summary">
+      <summary className="cursor-pointer list-none font-semibold text-muted hover:text-ink">
+        <span className="underline decoration-line underline-offset-4">How this search ran</span>
+      </summary>
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+        <dt className="text-muted">Total time</dt>
+        <dd className="tabular text-ink">{seconds(m.totalMs)}</dd>
+        <dt className="text-muted">Finding restaurants</dt>
+        <dd className="tabular text-ink">{seconds(m.understandAndDiscoverMs)}</dd>
+        <dt className="text-muted">Reading menus</dt>
+        <dd className="tabular text-ink">{seconds(m.researchMs)}</dd>
+        <dt className="text-muted">AI requests</dt>
+        <dd className="tabular text-ink">{m.aiRequests}</dd>
+        <dt className="text-muted">Tokens (in / out)</dt>
+        <dd className="tabular text-ink">
+          {m.inputTokens.toLocaleString("en-US")} / {m.outputTokens.toLocaleString("en-US")}
+        </dd>
+        <dt className="text-muted">Estimated cost</dt>
+        <dd className="tabular text-ink">${m.estimatedCostUsd.toFixed(3)}</dd>
+      </dl>
+      <p className="mt-2 text-xs text-muted">The cost is an estimate from assumed list prices, not a bill.{m.partial ? " The time limit was reached, so this search is partial." : ""}</p>
+    </details>
+  );
+}
+
+export function RecommendationResults({ set, metrics }: { set: RecommendationSet; metrics?: RunMetricsPublic }) {
   const exact = set.recommendations.filter((r) => r.tier === "exact");
   const others = set.recommendations.filter((r) => r.tier !== "exact");
   const hard = set.constraints.filter((c) => c.strength === "hard");
@@ -94,6 +124,8 @@ export function RecommendationResults({ set }: { set: RecommendationSet }) {
           <CardList items={others} />
         </div>
       ) : null}
+
+      {metrics ? <RunSummary m={metrics} /> : null}
 
       {set.excluded.length > 0 ? (
         <details className="rounded-card border-2 border-dashed border-line bg-surface/70 p-4 text-sm" data-testid="excluded-list">

@@ -146,7 +146,8 @@ export function evaluateRestaurant(cand: RecommendCandidate, constraints: Constr
         outcomes.push({ ...base, verdict: "met", dishCount: metDishes.length, note: `${plural(metDishes.length, "matching dish", "matching dishes")} with a verified price within €${c.value}; cheapest ${mains.length > 0 ? "main" : "dish"} is ${nameOf(cheapest)} at ${money(cheapest.price.amount as number)}` });
       } else if (possible.length > 0) {
         const reason = possible.map((e) => outcomeOf(e, c.id)).find((o) => o?.verdict === "uncertain")?.note;
-        outcomes.push({ ...base, verdict: "uncertain", note: priced === 0 ? `This menu lists no prices, so the €${c.value} budget can't be checked.${priceLevelHint(cand.restaurant)}` : (reason ?? `No matching dish has a verified price within €${c.value}`) });
+        const groupNote = possible.map((e) => outcomeOf(e, c.id)).find((o) => o?.note.includes("group set menu"))?.note;
+        outcomes.push({ ...base, verdict: "uncertain", note: groupNote ?? (priced === 0 ? `This menu lists no prices, so the €${c.value} budget can't be checked.${priceLevelHint(cand.restaurant)}` : (reason ?? `No matching dish has a verified price within €${c.value}`)) });
       } else if (nearMiss.length > 0) {
         const cheapest = [...nearMiss].sort((a, b) => (a.overBudgetBy ?? 0) - (b.overBudgetBy ?? 0))[0];
         outcomes.push({ ...base, verdict: "unmet", note: `The cheapest matching dish, ${nameOf(cheapest)}, is ${money(cheapest.price.amount as number)}, €${(cheapest.overBudgetBy ?? 0).toFixed(2)} over your €${c.value} budget` });
@@ -187,6 +188,9 @@ export function evaluateRestaurant(cand: RecommendCandidate, constraints: Constr
     if (restaurantBlockers.length > 0) tier = "uncertain";
     else if (softUnmet.length > 0) tier = "partial";
     else tier = "exact";
+  } else if (exactAll.some((e) => e.role === "other")) {
+    tier = "uncertain";
+    uncertainties.push(`We couldn't tell whether ${nameOf(exactAll.find((e) => e.role === "other") as DishEval)} and similar dishes are main courses.`);
   } else if (exactAll.length > 0) {
     tier = "partial";
     unmet.push(`Only sides, starters or desserts match your requirements; no ${meal?.label ?? "main course"} does.`);

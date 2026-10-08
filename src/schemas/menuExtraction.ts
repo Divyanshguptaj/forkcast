@@ -73,6 +73,7 @@ export const ExtractedDishSchema = z.object({
   section: z.string().max(120).optional(),
   offering: DishOffering,
   setMenuId: z.string().max(80).optional(),
+  course: z.enum(["starter", "main", "side", "dessert", "other"]).optional(),
   prices: z.array(DishPriceSchema).max(6),
   priceConflict: z.boolean(),
   diet: DishDietSchema,

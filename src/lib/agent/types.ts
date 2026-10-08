@@ -1,4 +1,4 @@
-import type { AgentEvent } from "@/schemas/events";
+import type { AgentEvent, RunMetricsPublic } from "@/schemas/events";
 import type { MenuItemPreview } from "@/schemas/menu";
 import type { RecommendationResponse } from "@/schemas/recommendation";
 import type { RecommendationSet } from "@/schemas/recommendations";
@@ -105,6 +105,7 @@ export interface RunState {
   explainDone: boolean;
   result?: RecommendationResponse;
   recommendations?: RecommendationSet;
+  metrics?: RunMetricsPublic;
   error?: RunError;
 }
 

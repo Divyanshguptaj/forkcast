@@ -18,7 +18,7 @@ export interface ComposerState {
 export const DEFAULT_COMPOSER: ComposerState = {
   text: "",
   city: "Barcelona",
-  meal: "dinner",
+  meal: "any",
   diet: [],
   cuisines: [],
   budgetMax: null,
@@ -90,11 +90,15 @@ export function toRecommendBody(state: ComposerState): RecommendRequestBodyType 
       cuisines: state.cuisines,
       budget: state.budgetMax === null ? undefined : { max: state.budgetMax, currency: "EUR", perPerson: true },
       allergies: state.allergies,
-      mustHave: state.mustHave,
+      preferences: state.mustHave,
       partySize: state.partySize ?? undefined,
       rawText: text || undefined,
     },
   };
+}
+
+export function hasRequest(state: ComposerState): boolean {
+  return state.text.trim().length > 0 || state.diet.length > 0 || state.cuisines.length > 0 || state.budgetMax !== null || state.meal !== "any";
 }
 
 export function summarize(state: ComposerState): string[] {

@@ -37,9 +37,10 @@ const TONES: Record<StepStatus, string> = {
 };
 
 export function PipelineChips({ steps }: { steps: RestaurantResearch["steps"] }) {
+  const hidden = (id: StepId) => id === "reviews" && steps.reviews.status === "done" && steps.reviews.detail === "skipped";
   return (
     <ul className="flex flex-wrap gap-1.5" aria-label="Research steps">
-      {STEP_ORDER.map((id) => {
+      {STEP_ORDER.filter((id) => !hidden(id)).map((id) => {
         const s = steps[id];
         return (
           <li

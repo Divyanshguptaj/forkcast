@@ -37,6 +37,7 @@ For each document:
    - originalDescription: only when the description lists ingredients or otherwise matters for diet; otherwise null. Never translate descriptions.
    - originalLanguage: ca, es, en or other.
    - priceRaw: ALWAYS fill this when a price is printed on the same row or directly beside the dish (menus often print prices in a right-hand column). The price text exactly as printed for that dish, including variants such as "S 8 / L 12" or "media 9,50 · entera 15". Use null when the dish has no price on the menu. NEVER guess or calculate a price. For dishes inside a fixed-price menu leave priceRaw null and put the menu price on the set menu.
+   - course: starter, main, side, dessert or other, from the menu's own headings when possible, otherwise your judgement of how the dish is normally served (a pizza, pasta, rice dish, curry or burger is a main). Use other when unclear.
    - section: the heading the dish sits under, as printed.
    - setMenus: fixed-price or group menus with id (short slug), name, priceRaw. Link dishes with setMenuId.
    - page: page number when the document has page markers like [page 2]; otherwise null.

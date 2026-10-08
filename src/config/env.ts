@@ -33,6 +33,10 @@ const envSchema = z.object({
   ),
   GEMINI_PRICE_CHECK_MODEL: z.string().default("gemini-3.5-flash-lite"),
   DEFAULT_CITY: z.string().default("barcelona"),
+  RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().min(1).max(1000).default(6),
+  RATE_LIMIT_WINDOW_SEC: z.coerce.number().int().min(10).max(86_400).default(600),
+  MAX_CONCURRENT_RUNS: z.coerce.number().int().min(1).max(100).default(4),
+  TRUST_PROXY_HEADERS: z.enum(["true", "false"]).default("true").transform((v) => v === "true"),
   PLACES_REQUEST_VEGETARIAN_SIGNAL: z
     .enum(["true", "false"])
     .default("true")

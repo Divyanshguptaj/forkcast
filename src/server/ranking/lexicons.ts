@@ -19,17 +19,18 @@ export function matchedWords(normalizedText: string, words: readonly string[]): 
 }
 
 const ROLE_WORDS: Array<[Exclude<DishRoleValue, "set_menu" | "other">, readonly string[]]> = [
-  ["dessert", ["postre", "dessert", "dolci", "dolc", "tiramisu", "helado", "gelat", "flan", "tarta", "pastis", "cheesecake", "brownie", "mousse", "coulant", "panna cotta", "crema catalana", "sweet"]],
-  ["side", ["guarnicion", "guarnicions", "acompanamiento", "acompanyament", "side", "contorni"]],
-  ["starter", ["entrante", "entrants", "starter", "aperitivo", "aperitiu", "tapas", "tapes", "para compartir", "per compartir", "antipasti", "antipasto", "picoteo", "ensalada", "amanida", "salad", "sopa", "soup", "croquetas", "croquetes", "bruschetta", "per comencar", "para empezar"]],
-  ["main", ["principal", "plat principal", "main", "segundos", "secondi", "primi", "primeros", "primers", "plato", "plats", "pasta", "pizza", "risotto", "arroz", "arros", "paella", "hamburguesa", "burger", "carnes", "pescados", "lasagna", "lasana", "gnocchi", "ravioli", "canelones", "canelons", "tagliatelle", "spaghetti", "parmigiana", "wok", "curry"]],
+  ["dessert", ["postre", "dessert", "dolci", "dolc", "tiramisu", "helado", "gelat", "gelato", "ice cream", "sorbet", "flan", "tarta", "pastis", "cake", "cheesecake", "brownie", "mousse", "coulant", "panna cotta", "crema catalana", "churro", "cannoli", "pudding", "brulee", "sweet", "nachspeise", "sobremesa", "dessert"]],
+  ["side", ["guarnicion", "guarnicions", "acompanamiento", "acompanyament", "side", "sides", "contorni", "beilage", "fries", "patatas fritas"]],
+  ["starter", ["entrante", "entrants", "starter", "appetizer", "appetiser", "aperitivo", "aperitiu", "tapas", "tapes", "para compartir", "per compartir", "antipasti", "antipasto", "picoteo", "ensalada", "amanida", "salad", "sopa", "soup", "croquetas", "croquetes", "bruschetta", "per comencar", "para empezar", "mezze", "vorspeise", "entree francais", "dim sum", "samosa", "edamame", "hummus"]],
+  ["main", ["principal", "plat principal", "main", "mains", "segundos", "secondi", "primi", "primeros", "primers", "plato", "plats", "plat", "piatti", "prato", "hauptgericht", "pasta", "pizza", "pinsa", "calzone", "risotto", "arroz", "arros", "paella", "fideua", "hamburguesa", "burger", "carnes", "pescados", "lasagna", "lasana", "gnocchi", "ravioli", "canelones", "canelons", "tagliatelle", "spaghetti", "fettuccine", "linguine", "penne", "rigatoni", "parmigiana", "wok", "curry", "biryani", "masala", "tikka", "korma", "thali", "ramen", "udon", "soba", "pho", "noodle", "burrito", "taco", "enchilada", "fajita", "quesadilla", "bowl", "poke", "sandwich", "bocadillo", "wrap", "tagine", "tajine", "moussaka", "stew", "estofado", "guiso", "cocido", "steak", "entrecot", "schnitzel", "roast", "grill", "casserole", "gratin"]],
 ];
 
-export function dishRole(section: string | undefined, name: string, offering: "a_la_carte" | "set_menu" | "dessert"): DishRoleValue {
+export function dishRole(section: string | undefined, name: string, offering: "a_la_carte" | "set_menu" | "dessert", course?: string): DishRoleValue {
   if (offering === "set_menu") return "set_menu";
   if (offering === "dessert") return "dessert";
   const bySection = section ? normalizeText(section) : "";
   for (const [role, words] of ROLE_WORDS) if (bySection && hasWord(bySection, words)) return role;
+  if (course === "starter" || course === "main" || course === "side" || course === "dessert") return course;
   const byName = normalizeText(name);
   for (const [role, words] of ROLE_WORDS) if (hasWord(byName, words)) return role;
   return "other";
@@ -37,8 +38,8 @@ export function dishRole(section: string | undefined, name: string, offering: "a
 
 export const ROLE_WEIGHT: Record<DishRoleValue, number> = { main: 1, set_menu: 1, starter: 0.6, other: 0.6, side: 0.4, dessert: 0.25 };
 
-const LIGHT_MEAL_ROLES: ReadonlySet<DishRoleValue> = new Set<DishRoleValue>(["main", "set_menu", "starter", "other"]);
-const FULL_MEAL_ROLES: ReadonlySet<DishRoleValue> = new Set<DishRoleValue>(["main", "set_menu", "other"]);
+const LIGHT_MEAL_ROLES: ReadonlySet<DishRoleValue> = new Set<DishRoleValue>(["main", "set_menu", "starter"]);
+const FULL_MEAL_ROLES: ReadonlySet<DishRoleValue> = new Set<DishRoleValue>(["main", "set_menu"]);
 
 export function mealRoles(meal: string): { roles: ReadonlySet<DishRoleValue>; label: string } {
   return meal === "lunch" || meal === "dinner" ? { roles: FULL_MEAL_ROLES, label: "main course" } : { roles: LIGHT_MEAL_ROLES, label: "main course or starter" };

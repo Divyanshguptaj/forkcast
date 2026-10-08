@@ -37,6 +37,7 @@ export const MatchedDishPriceSchema = z.object({
   confidence: Confidence.optional(),
   alternateAmount: z.number().min(0.01).max(1000).optional(),
   setMenuName: z.string().max(120).optional(),
+  groupMenu: z.object({ name: z.string().max(120), amount: z.number().min(0.01).max(1000).optional() }).optional(),
 });
 
 export const MatchedDishSchema = z.object({
@@ -120,6 +121,7 @@ export const MatchedRestaurantSchema = z.object({
   reasons: z.array(ReasonSchema),
   unmet: z.array(z.string().max(300)),
   uncertainties: z.array(z.string().max(300)),
+  allergyWarning: z.string().max(300).optional(),
   menuStatus: z.enum(["extracted", "partial"]),
   menuSources: z.array(MenuSourceSchema),
   links: z.array(RecommendationLinkSchema),

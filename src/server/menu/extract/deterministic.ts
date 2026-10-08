@@ -45,6 +45,7 @@ export function deterministicDocument(documentId: string, text: string): ModelDo
     originalLanguage: "other",
     section: d.section,
     setMenuId: undefined,
+    course: undefined,
     priceRaw: d.priceRaw,
     evidence: d.line,
     page: d.page,

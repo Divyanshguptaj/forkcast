@@ -200,7 +200,8 @@ describe("prices and budget", () => {
     const menu = extraction("a", [dish({ name: "Supplì (V)", veg: "confirmed", offering: "set_menu", setMenuId: "m1", price: null })], {}, setMenus);
     const r = find(run(request({ diet: ["vegetarian"], budget: budget(30) }), [candidate("a", menu)]), "a")!;
     expect(r.tier).toBe("uncertain");
-    expect(r.dishes[0].price).toMatchObject({ amount: 24, setMenuName: "MENÚ GRUPO" });
+    expect(r.dishes[0].price).toMatchObject({ status: "absent", groupMenu: { name: "MENÚ GRUPO", amount: 24 } });
+    expect(r.dishes[0].price.amount).toBeUndefined();
     expect(r.outcomes.find((o) => o.kind === "budget")?.note).toContain("group booking");
   });
 

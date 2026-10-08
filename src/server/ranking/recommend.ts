@@ -89,6 +89,7 @@ function pickDishes(ev: Evaluated, constraints: Constraint[], limits: RecommendL
 
 function dishLabel(d: MatchedDish): string {
   const name = d.translatedName ?? d.name;
+  if (d.price.groupMenu) return `${name} (group menu only)`;
   const priced = (d.price.status === "verified" || d.price.status === "ocr_agreed") && d.price.amount !== undefined;
   if (!priced) return name;
   return d.price.setMenuName ? `${name} (set menu ${money(d.price.amount as number)})` : `${name} (${money(d.price.amount as number)})`;
@@ -152,6 +153,7 @@ function toRestaurant(ev: Evaluated, constraints: Constraint[], limits: Recommen
   const r = ev.candidate.restaurant;
   const dishes = pickDishes(ev, constraints, limits);
   const { components, total } = scoreRestaurant(ev);
+  const allergy = constraints.filter((c) => c.kind === "allergy").map((c) => c.value).join(", ") || undefined;
   const docs = ev.extraction.documents.filter((d) => d.status === "extracted" || d.status === "partial");
   const menuSources = docs.map((d) => ({ documentId: d.documentId, url: d.url, tier: d.tier, ...(d.method ? { method: d.method } : {}), status: d.status }));
   const links: MatchedRestaurant["links"] = [];
@@ -179,6 +181,7 @@ function toRestaurant(ev: Evaluated, constraints: Constraint[], limits: Recommen
     reasons: buildReasons(ev, dishes, constraints),
     unmet: ev.unmet,
     uncertainties: ev.uncertainties,
+    ...(allergy ? { allergyWarning: `Forkcast cannot confirm that any dish is free of ${allergy}. Dishes that mention it were removed, but menus rarely list every ingredient or cross-contact risk. Tell the restaurant about your allergy before ordering.` } : {}),
     menuStatus: ev.extraction.status === "partial" ? "partial" : "extracted",
     menuSources,
     links,

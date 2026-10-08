@@ -60,10 +60,16 @@ function dislikeOutcome(dish: ExtractedDish, c: Constraint): DishOutcome {
   return { ...base, verdict: "met", plausible: true, note: `No ${c.value} mentioned` };
 }
 
+const GROUP_MENU = /\b(group|groups|grupo|grupos|grup|grups|colla|event|evento|events|esdeveniment|party|banquet|banquete)\b/;
+
 export function choosePrice(dish: ExtractedDish, setMenus: Map<string, SetMenu>): MatchedDish["price"] {
   const setMenu = dish.setMenuId ? setMenus.get(dish.setMenuId) : undefined;
   const prices: DishPrice[] = setMenu ? setMenu.prices : dish.prices;
   const withName = <T extends object>(p: T) => (setMenu ? { ...p, setMenuName: setMenu.name.slice(0, 120) } : p);
+  if (setMenu && GROUP_MENU.test(normalizeText(setMenu.name))) {
+    const listed = setMenu.prices.find((p) => p.amount !== undefined && (p.status === "verified" || p.status === "ocr_agreed" || p.status === "unverified"));
+    return { currency: "EUR", status: "absent" as const, setMenuName: setMenu.name.slice(0, 120), groupMenu: { name: setMenu.name.slice(0, 120), ...(listed?.amount !== undefined ? { amount: listed.amount } : {}) } };
+  }
 
   const graded = prices.filter((p) => isBudgetGradePrice(p) && p.currency === "EUR").sort((a, b) => (a.amount as number) - (b.amount as number));
   const pick = graded[0] ?? prices.find((p) => p.status === "unverified" && p.amount !== undefined) ?? prices.find((p) => p.status === "disputed") ?? prices.find((p) => p.amount !== undefined);
@@ -78,13 +84,11 @@ export function choosePrice(dish: ExtractedDish, setMenus: Map<string, SetMenu>)
   });
 }
 
-const GROUP_MENU = /\b(group|groups|grupo|grupos|grup|grups|colla|event|evento|events|esdeveniment|party|banquet|banquete)\b/;
-
 function budgetOutcome(price: MatchedDish["price"], c: Constraint): DishOutcome & { over?: number } {
   const base = { constraintId: c.id, kind: c.kind, blocking: c.blocking } as const;
   const max = Number(c.value);
-  if (price.setMenuName && GROUP_MENU.test(normalizeText(price.setMenuName))) {
-    return { ...base, verdict: "uncertain", plausible: true, note: `The only price is for the group set menu "${price.setMenuName}"${price.amount !== undefined ? ` (${money(price.amount)})` : ""}, which may need a group booking` };
+  if (price.groupMenu) {
+    return { ...base, verdict: "uncertain", plausible: true, note: `Only listed on the group set menu "${price.groupMenu.name}"${price.groupMenu.amount !== undefined ? ` (${money(price.groupMenu.amount)})` : ""}, which may need a group booking, so there is no individual price` };
   }
   const graded = (price.status === "verified" || price.status === "ocr_agreed") && price.amount !== undefined;
   if (graded && price.currency !== "EUR") return { ...base, verdict: "uncertain", plausible: true, note: `Price is in ${price.currency}; Forkcast does not convert currencies` };
@@ -99,7 +103,7 @@ function budgetOutcome(price: MatchedDish["price"], c: Constraint): DishOutcome 
 }
 
 export function evaluateDish(dish: ExtractedDish, setMenus: Map<string, SetMenu>, constraints: Constraint[]): DishEval {
-  const role = dishRole(dish.section, dish.originalName, dish.offering);
+  const role = dishRole(dish.section, dish.originalName, dish.offering, dish.course);
   const price = choosePrice(dish, setMenus);
   const outcomes: DishOutcome[] = [];
   const strengths: number[] = [];

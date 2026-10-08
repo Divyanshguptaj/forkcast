@@ -22,6 +22,8 @@ export interface SourceDoc {
 const URL_LIKE = /https?:\/\/|www\./i;
 const INSTRUCTION_LIKE = /ignore (?:all |any )?(?:previous|prior)|system prompt|as an ai|you must|mark (?:every|all)/i;
 
+const GROUP_SECTION = /\b(?:grupos?|groups?|grups?|events?|eventos?)\b/;
+
 const collapse = (value: string) => normalizeText(value).replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 
 export function quoteInSource(sourceNorm: string, quote: string): boolean {
@@ -117,7 +119,8 @@ export function buildFromModel(doc: ModelDocument, ctx: BuildContext): BuildResu
       return;
     }
     const setId = d.setMenuId ? setIds.get(d.setMenuId) : undefined;
-    const prices = setId ? [{ status: "absent" as const, currency: "EUR" }] : buildPrices(d.priceRaw, source, sourceNorm, d.originalName, warnings);
+    const inSetMenu = Boolean(setId) || ctx.offeringDefault === "set_menu" || GROUP_SECTION.test(normalizeText(d.section ?? ""));
+    const prices = inSetMenu ? [{ status: "absent" as const, currency: "EUR" }] : buildPrices(d.priceRaw, source, sourceNorm, d.originalName, warnings);
 
     const evidenceFn = (quote: string) => (sourceNorm ? quoteInSource(sourceNorm, quote) : false);
     const diet = assessDiet({
@@ -142,8 +145,9 @@ export function buildFromModel(doc: ModelDocument, ctx: BuildContext): BuildResu
       ...(cleanText(d.originalDescription) ? { originalDescription: d.originalDescription } : {}),
       ...(translated && cleanText(d.translatedDescription) ? { translatedDescription: d.translatedDescription } : {}),
       originalLanguage: d.originalLanguage,
+      ...(d.course && d.course !== "other" ? { course: d.course } : {}),
       ...(d.section ? { section: d.section } : {}),
-      offering: setId ? "set_menu" : ctx.offeringDefault,
+      offering: inSetMenu ? "set_menu" : ctx.offeringDefault,
       ...(setId ? { setMenuId: setId } : {}),
       prices,
       priceConflict: false,

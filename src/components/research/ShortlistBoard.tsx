@@ -33,7 +33,7 @@ export function ShortlistBoard({ state, mocked }: Props) {
         <h2 id="shortlist-heading" className="text-3xl font-extrabold">
           {ids.length} place{ids.length === 1 ? "" : "s"} made the shortlist
         </h2>
-        <p className="mt-1 text-muted">Research candidates, not recommendations yet. Forkcast is still reading their menus and checking diners.</p>
+        <p className="mt-1 text-muted">Research candidates, not recommendations yet. Forkcast is still reading their menus.</p>
       </div>
       <ol className="space-y-3">
         {ids.map((id, i) => (

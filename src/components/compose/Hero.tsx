@@ -8,7 +8,7 @@ export function Hero() {
         Tell us what you&apos;re <span className="text-saffron">hungry</span> for.
       </h1>
       <p className="max-w-2xl text-pretty text-lg text-muted sm:text-xl">
-        Forkcast researches real restaurants, reads their menus and checks what diners say, then shows you why each place made the cut.
+        Forkcast researches real restaurants, reads their menus dish by dish, then shows you which places truly fit and why.
       </p>
       <ol className="flex flex-wrap gap-x-5 gap-y-2 pt-1 text-sm font-semibold text-ink" aria-label="How it works">
         <li>

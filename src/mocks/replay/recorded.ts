@@ -60,7 +60,7 @@ function restaurantTimeline(c: Recording["candidates"][number], startAt: number)
   if (e.status === "unavailable" || e.status === "failed" || good.length === 0) {
     entries.push({ at: t(1500), event: { type: "menu.resolved", id, status: "unavailable", documentCount: 0, reason: "no_menu_found" } });
     entries.push({ at: t(1600), event: step(id, "menu", "warning", e.reason?.slice(0, 120) ?? "No readable menu") });
-    entries.push({ at: t(1700), event: step(id, "reviews", "warning", "Review research is not part of this run") });
+    entries.push({ at: t(1700), event: step(id, "reviews", "done", "skipped") });
     return entries;
   }
 
@@ -76,7 +76,7 @@ function restaurantTimeline(c: Recording["candidates"][number], startAt: number)
     { at: t(3300), event: { type: "menu.resolved", id, status: e.status === "partial" ? "partial" : "found", documentCount: good.length, sourceTier: first?.tier } },
     { at: t(3350), event: { type: "menu.extracted", id, status: e.status, documentCount: good.length, skippedCount: e.documents.length - good.length, dishCount: e.dishes.length } },
     { at: t(3400), event: step(id, "menu", e.status === "partial" ? "warning" : "done", e.status === "partial" ? "Part of the menu could not be read" : undefined) },
-    { at: t(3500), event: step(id, "reviews", "warning", "Review research is not part of this run") },
+    { at: t(3500), event: step(id, "reviews", "done", "skipped") },
   );
   return entries;
 }

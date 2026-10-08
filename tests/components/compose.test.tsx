@@ -26,7 +26,7 @@ function Harness({ onChange }: { onChange?: (s: ComposerState) => void }) {
 
 describe("composer model", () => {
   it("builds a request body the API schema accepts", () => {
-    const body = toRecommendBody({ ...DEFAULT_COMPOSER, text: "  vegetarian dinner  ", diet: ["vegetarian"], cuisines: ["Italian"], budgetMax: 30, allergies: ["peanuts"] });
+    const body = toRecommendBody({ ...DEFAULT_COMPOSER, meal: "dinner", text: "  vegetarian dinner  ", diet: ["vegetarian"], cuisines: ["Italian"], budgetMax: 30, allergies: ["peanuts"] });
     expect(RecommendRequestBody.safeParse(body).success).toBe(true);
     expect(body.text).toBe("vegetarian dinner");
     expect(body.form).toMatchObject({ city: "Barcelona", meal: "dinner", diet: ["vegetarian"], cuisines: ["Italian"], allergies: ["peanuts"], budget: { max: 30, currency: "EUR" } });
@@ -35,12 +35,12 @@ describe("composer model", () => {
   it("omits the budget when 'any budget' is chosen and keeps free text out of the structured fields", () => {
     const body = toRecommendBody({ ...DEFAULT_COMPOSER, text: "Somewhere not too crowded" });
     expect(body.form?.budget).toBeUndefined();
-    expect(body.form?.preferences).toBeUndefined();
+    expect(body.form?.preferences).toEqual([]);
     expect(body.form?.rawText).toBe("Somewhere not too crowded");
   });
 
   it("summarizes the selection", () => {
-    expect(summarize({ ...DEFAULT_COMPOSER, diet: ["vegan"], cuisines: ["Italian"], budgetMax: 25 })).toEqual(["Barcelona", "Dinner", "Vegan", "Italian", "Under €25"]);
+    expect(summarize({ ...DEFAULT_COMPOSER, meal: "dinner", diet: ["vegan"], cuisines: ["Italian"], budgetMax: 25 })).toEqual(["Barcelona", "Dinner", "Vegan", "Italian", "Under €25"]);
   });
 
   it("toggles list membership", () => {
@@ -53,7 +53,7 @@ describe("SearchComposer", () => {
   it("labels the sentence box and states what is and isn't understood", () => {
     render(<SearchComposer onSubmit={() => undefined} />);
     expect(screen.getByLabelText("What are you hungry for?")).toBeInTheDocument();
-    expect(screen.getByText(/free-text sentences comes in a later release/i)).toBeInTheDocument();
+    expect(screen.getByText(/Write it the way you would say it/i)).toBeInTheDocument();
   });
 
   it("fills both the sentence and the filters from an example", async () => {
@@ -73,8 +73,22 @@ describe("SearchComposer", () => {
     await user.click(screen.getByRole("button", { name: /Find my table/ }));
     expect(onSubmit).toHaveBeenCalledOnce();
     const [body, state] = onSubmit.mock.calls[0];
-    expect(body.form).toMatchObject({ cuisines: ["Italian"], budget: { max: 40 }, mustHave: ["Quiet"] });
+    expect(body.form).toMatchObject({ cuisines: ["Italian"], budget: { max: 40 }, preferences: ["Quiet"] });
     expect(state.text).toBe("Romantic Italian dinner, around €40");
+  });
+
+  it("asks for something to search for instead of submitting an empty request", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<SearchComposer onSubmit={onSubmit} />);
+    await user.click(screen.getByRole("button", { name: /Find my table/ }));
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(/Describe what you are hungry for/);
+    expect(screen.getByLabelText("What are you hungry for?")).toHaveFocus();
+    await user.type(screen.getByLabelText("What are you hungry for?"), "vegan lunch");
+    expect(screen.queryByRole("alert")).toBeNull();
+    await user.click(screen.getByRole("button", { name: /Find my table/ }));
+    expect(onSubmit).toHaveBeenCalledOnce();
   });
 
   it("does not submit while busy", async () => {

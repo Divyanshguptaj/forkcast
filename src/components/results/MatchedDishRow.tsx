@@ -44,7 +44,13 @@ export function MatchedDishRow({ dish }: { dish: MatchedDish }) {
         </div>
         <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
           <PriceTag price={dish.price.amount} status={dish.price.status} />
-          {dish.price.setMenuName ? <span className="text-xs text-muted">price of set menu “{dish.price.setMenuName}”</span> : null}
+          {dish.price.groupMenu ? (
+            <span className="max-w-60 text-xs text-muted sm:text-right">
+              Group menu “{dish.price.groupMenu.name}”{dish.price.groupMenu.amount !== undefined ? ` (€${dish.price.groupMenu.amount.toFixed(2)} per person)` : ""}. May need a group booking.
+            </span>
+          ) : dish.price.setMenuName ? (
+            <span className="text-xs text-muted">price of set menu “{dish.price.setMenuName}”</span>
+          ) : null}
           {dish.price.label && !dish.price.setMenuName ? <span className="text-xs text-muted">{dish.price.label}</span> : null}
           {dish.price.status === "disputed" && dish.price.alternateAmount !== undefined ? <span className="text-xs text-chili">other reading €{dish.price.alternateAmount.toFixed(2)}</span> : null}
         </div>
@@ -63,6 +69,7 @@ export function MatchedDishRow({ dish }: { dish: MatchedDish }) {
         })}
       </div>
       {budgetNote ? <p className="text-xs text-muted">Budget: {budgetNote}</p> : null}
+      {dish.outcomes.some((o) => o.kind === "allergy") ? <p className="text-xs font-semibold text-saffron">Allergens not verified for this dish. Ask the restaurant.</p> : null}
       {dish.source.evidence ? <p className="text-xs italic text-muted [overflow-wrap:anywhere]">“{dish.source.evidence}”</p> : null}
       <p className="text-xs text-muted">
         <a href={dish.source.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline decoration-line underline-offset-4 hover:text-ink">
