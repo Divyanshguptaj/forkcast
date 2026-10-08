@@ -56,7 +56,7 @@ Theoretical ceiling (all limits hit at once): about $0.48 per search with the as
 2. Vercel: create the project from the private repository, confirm Fluid compute is enabled, add environment variables, deploy a **Preview** first.
 3. Check the Vercel spend-management setting for the team so a traffic spike cannot run up Vercel usage; consider a Vercel Firewall rate-limit rule on `/api/recommend` if your plan includes it (verify availability on your plan before relying on it).
 4. Smoke test on the preview: run one search in a real browser, confirm progressive events, then cancel one and confirm the log shows `cancelled`; confirm `GET /api/health` shows all three keys `true`.
-5. Decide on the Git history cleanup before making the repository public (`docs/git-history-cleanup.md`).
+5. Git history: this repository already has the Google Places recordings removed from every commit (see `docs/git-history-cleanup.md`); the private predecessor repository still contains them and should stay private or be deleted.
 6. Optional: protect the preview/production URL (Vercel Deployment Protection) while you evaluate it, so only people you share it with can spend your quota.
 
 ## 5. Rollback

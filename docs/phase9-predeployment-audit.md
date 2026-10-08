@@ -11,7 +11,7 @@ Nothing was deployed, no history was rewritten, no force-push was made, and repo
 | P1 | No cost ceiling for a public demo: only per-client and concurrent limits. | Fixed: `GLOBAL_MAX_SEARCHES_PER_DAY` (default 100 per instance) returns a friendly "demo limit reached". Test added. Per-instance only, see risks. |
 | P1 | The understanding step (Gemini) could hold up the whole search for 15-20 s when the model is slow. A minimal 21-token request measured 18-25 s on the only model with quota left today. | Fixed: capped at 6 s, then the built-in parser is used. Test added. |
 | P1 | `/api/health` was public and listed model names, flags and limits. | Fixed: returns only whether each key is configured. |
-| P1 | Real Google Places recordings remain in Git history. | Investigated; cleanup plan and dry run in `docs/git-history-cleanup.md`. Needs your approval. |
+| P1 | Real Google Places recordings remain in Git history. | Resolved in this repository by rewriting history (see `docs/git-history-cleanup.md`); the private predecessor repository still contains the recordings. |
 | P2 | After an error before any event, the progress bar showed an empty summary and the "Understanding" stage looked active forever. | Fixed (shows what you typed, stage says "Search stopped"). |
 | P2 | Hero and README wording was checked again for claims (reviews, atmosphere, unsupported diets). None remain. | OK |
 | P2 open | A Gemini call that times out fails that document (basic-parser fallback) instead of trying the next model. A slow model therefore costs a whole document. | Documented, not changed (larger behaviour change). |
@@ -49,6 +49,6 @@ See `docs/deployment.md` for the Vercel compatibility table (Node 22, route `max
 
 - **Gemini latency and quota.** On the free tier only one model had quota left today, and a 21-token request took 18-25 s on it. Searches took 50-72 s instead of 17-34 s, close to the 72 s soft deadline (partial results are returned). Use a billed Gemini key for a live demo; otherwise expect slow or partially basic-parser results.
 - **Per-instance limits on Vercel.** The daily ceiling and rate limits multiply with instance count. Provider-side budgets are the hard backstop.
-- **Places content in history** until you approve the cleanup.
+- **Places content** remains only in the private predecessor repository.
 - **Streaming on Vercel is unverified** until a preview deployment is tried (progressive delivery and cancel).
 - Results vary run to run (Places shortlist, Gemini output).
