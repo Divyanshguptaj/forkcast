@@ -7,7 +7,7 @@ Status: **prepared, not deployed.** Nothing here has been run on Vercel. Platfor
 | Topic | Finding |
 |---|---|
 | Framework | Next.js 16 (App Router). `vercel.json` sets `framework: nextjs` and one region (`fra1`, Frankfurt, close to Spain). Region choice is free; adding more regions is not. |
-| Node | `engines.node` is `>=22`; Vercel supports Node 22 and the local build was verified on 22.13. |
+| Node | `engines.node` is `22.x` (the project is also pinned to Node 22.x in Vercel settings, because the Vercel default is 24.x and the tested version is 22). |
 | Route runtime | `/api/recommend` is a Node.js route handler (not Edge). It exports `maxDuration = 120`. Vercel supports a named `maxDuration` export for the Next.js App Router, and the duration includes time spent streaming the response ([Configuring maximum duration](https://vercel.com/docs/functions/configuring-functions/duration)). |
 | Duration limit | With Fluid compute, Hobby has a 300 s maximum and Pro 800 s ([Limits](https://vercel.com/docs/functions/limitations)). A search takes 15-45 s and is hard-stopped at 90 s, so 120 s is safe. Projects created before 23 April 2025 without Fluid compute have a 60 s maximum on Hobby, which would be too short: check that Fluid compute is on for the project. |
 | Memory | Hobby functions have up to 2 GB. Measured in live runs: about +170 to +280 MB resident memory per search (menus up to a few MB each, 10-20 MB fetched per search). With the default `MAX_CONCURRENT_RUNS=4` that is roughly 1.1 GB worst case plus the Next.js baseline, under 2 GB. Do not raise the concurrency without re-measuring. |
