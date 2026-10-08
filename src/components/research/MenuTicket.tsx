@@ -16,7 +16,7 @@ export function MenuTicket({ items, demo = false, caption }: Props) {
   const reduce = usePrefersReducedMotion();
   if (items.length === 0) return null;
   return (
-    <figure className="relative rounded-control border-2 border-ink bg-surface-2 px-4 pt-3 shadow-soft">
+    <figure className="scallop-bottom relative mb-2 rounded-control border-2 border-ink bg-surface-2 px-4 pb-3 pt-3 shadow-soft">
       <figcaption className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-dashed border-line pb-2">
         <span className="font-display text-sm font-extrabold uppercase tracking-widest text-saffron">🧾 Menu ticket</span>
         <span className="flex items-center gap-2 text-xs text-muted">

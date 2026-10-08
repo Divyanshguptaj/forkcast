@@ -63,12 +63,21 @@ export function RestaurantMatchCard({ r, headingLevel = 3 }: { r: MatchedRestaur
       aria-label={`Recommendation ${r.rank}: ${r.name}`}
       data-testid="recommendation-card"
       data-tier={r.tier}
-      className={cx("rounded-card border-2 bg-surface p-4 sm:p-6", lead ? "border-ink shadow-pop" : r.tier === "exact" ? "border-line" : "border-dashed border-line")}
+      className={cx("relative rounded-card border-2 bg-surface p-4 sm:p-6", lead ? "border-ink shadow-pop" : r.tier === "exact" ? "border-line" : "border-dashed border-line")}
     >
+      {lead ? (
+        <span
+          aria-hidden="true"
+          className="tabular absolute -top-3.5 right-4 rotate-3 rounded-lg border-2 border-ink bg-saffron px-3 py-0.5 text-xs font-medium uppercase tracking-[0.14em] text-bg shadow-pop-sm"
+        >
+          Forkcast pick
+        </span>
+      ) : null}
       <header className="flex items-start gap-3 sm:gap-4">
         <span
           aria-hidden="true"
           className={cx(
+            lead && "stamp-land",
             "flex shrink-0 -rotate-3 items-center justify-center rounded-xl border-2 font-display font-extrabold",
             lead ? "size-14 border-ink bg-tomato text-3xl text-bg" : r.tier === "exact" ? "size-11 border-ink bg-saffron text-2xl text-bg" : "size-11 border-line bg-surface-2 text-2xl text-ink",
           )}

@@ -34,8 +34,8 @@ export function DiscoveryFunnel({ discovered, shortlisted }: Props) {
           <CountUp value={discovered} /> <span className="text-xl font-bold text-muted">places discovered</span>
         </p>
         {shortlisted > 0 ? (
-          <motion.p initial={reduce ? false : { opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="text-sm font-bold text-saffron">
-            → {shortlisted} made the shortlist
+          <motion.p initial={reduce ? false : { opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} className="font-display text-2xl font-extrabold text-tomato">
+            → {shortlisted} <span className="text-sm font-bold text-saffron">made the shortlist</span>
           </motion.p>
         ) : (
           <p className="text-sm text-muted">Comparing the promising ones…</p>

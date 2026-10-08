@@ -54,11 +54,14 @@ export function PreferenceChips({ state, onChange }: Props) {
                 aria-controls={`${baseId}-${t.id}`}
                 onClick={() => setOpen(expanded ? null : t.id)}
                 className={cx(
-                  "flex min-h-14 w-full items-center gap-2.5 rounded-control border-2 px-3 py-2 text-left transition-[transform,border-color,background-color] duration-150 ease-snap hover:-translate-y-px sm:w-auto",
+                  "flex min-h-14 w-full items-center gap-2.5 rounded-lg border-2 py-2 pl-0 pr-3 text-left transition-[transform,border-color,background-color] duration-150 ease-snap hover:-translate-y-px sm:w-auto",
                   expanded ? "border-ink bg-surface-2" : t.active ? "border-saffron/70 bg-surface" : "border-line bg-surface hover:border-ink/50",
                 )}
               >
-                <span aria-hidden="true" className="text-lg leading-none">
+                <span
+                  aria-hidden="true"
+                  className={cx("flex min-h-10 w-10 shrink-0 items-center justify-center self-stretch border-r-2 border-dashed border-line text-lg leading-none", t.active ? "bg-saffron/20" : "bg-surface-2")}
+                >
                   {t.emoji}
                 </span>
                 <span className="min-w-0">

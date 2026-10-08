@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
-import { Search } from "lucide-react";
+import { ArrowRight, Search } from "lucide-react";
 import { Button } from "@/components/shared/Button";
 import type { RecommendRequestBodyType } from "@/schemas/request";
 import { ExampleQueries } from "./ExampleQueries";
@@ -46,7 +46,11 @@ export function SearchComposer({ initial, busy = false, allowEmpty = false, subm
 
   return (
     <form onSubmit={submit} className="space-y-5" aria-label="Describe what you're hungry for">
-      <div className="rounded-card border-2 border-ink bg-surface p-3 shadow-pop sm:p-4">
+      <div className="relative rounded-card border-2 border-ink bg-surface p-3 shadow-pop sm:p-4">
+        <div aria-hidden="true" className="tabular mb-2 flex justify-between border-b-2 border-dashed border-line pb-2 text-[11px] uppercase tracking-[0.14em] text-muted">
+          <span>Order no. 042</span>
+          <span>Table for 1 · Barcelona</span>
+        </div>
         <label htmlFor="craving" className="sr-only">
           What are you hungry for?
         </label>
@@ -66,9 +70,10 @@ export function SearchComposer({ initial, busy = false, allowEmpty = false, subm
           <p id="craving-help" className="text-xs text-muted">
             Write it the way you would say it. The filters below are optional and add to your sentence.
           </p>
-          <Button type="submit" disabled={busy} className="sm:shrink-0">
+          <Button type="submit" disabled={busy} className="min-h-14 -rotate-1 px-7 text-lg shadow-pop hover:-rotate-2 sm:shrink-0">
             <Search aria-hidden="true" className="size-5" />
             {submitLabel}
+            <ArrowRight aria-hidden="true" className="size-5" />
           </Button>
         </div>
       </div>

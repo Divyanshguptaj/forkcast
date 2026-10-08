@@ -10,6 +10,7 @@ import { DiscoveryFunnel } from "./DiscoveryFunnel";
 import { ResearchTrail } from "./ResearchTrail";
 import { ShortlistBoard } from "./ShortlistBoard";
 import { requestSummaryParts, stageViews } from "./stageCopy";
+import { PlayfulStatus } from "./PlayfulStatus";
 import { ToolActivityStrip } from "./ToolActivityBadge";
 
 interface Props {
@@ -65,6 +66,8 @@ export function AgentResearchView({ state, mockedStages = false, live = false, p
       <p className="sr-only" role="status" aria-live="polite">
         {active ? `${active.title}. ${active.detail ?? ""}` : state.stages.ready === "done" ? "Recommendations ready." : ""}
       </p>
+
+      {live && running ? <PlayfulStatus /> : null}
 
       <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="lg:sticky lg:top-6 lg:self-start">
