@@ -12,3 +12,5 @@ next-env.d.ts
 *.pem
 npm-debug.log*
 fixtures/places/
+/test-results/
+/playwright-report/

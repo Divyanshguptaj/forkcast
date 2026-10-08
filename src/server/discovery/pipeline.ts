@@ -59,7 +59,12 @@ export async function runDiscovery(body: RecommendRequestBodyType, deps: Discove
         id: e.placeId,
         name: e.name,
         rating: e.discovered.restaurant.rating,
+        ratingCount: e.discovered.restaurant.ratingCount,
+        priceLevel: e.discovered.restaurant.priceLevel,
         distanceKm: e.distanceKm,
+        address: e.discovered.restaurant.address,
+        primaryType: e.discovered.restaurant.primaryType,
+        mapsUrl: e.discovered.restaurant.mapsUrl,
       })),
     });
 
