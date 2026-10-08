@@ -18,7 +18,10 @@ export function matchedWords(normalizedText: string, words: readonly string[]): 
   return words.map((w) => normalizeText(w)).filter((w) => hasWord(normalizedText, [w]));
 }
 
-const ROLE_WORDS: Array<[Exclude<DishRoleValue, "set_menu" | "other">, readonly string[]]> = [
+const DRINK_SECTION_WORDS = ["bebida", "bebidas", "begudes", "beverage", "drink", "cocktail", "coctel", "cocteles", "vino", "vinos", "vi", "wine", "cerveza", "cervezas", "cervesa", "beer", "licor", "licores", "spirits", "infusiones", "refrescos", "cafes", "coffee", "bar"];
+const DRINK_NAME_WORDS = ["spritz", "aperol", "vermut", "vermouth", "cocktail", "coctel", "negroni", "mojito", "sangria", "cava", "cerveza", "cervesa", "beer", "vino", "wine", "whisky", "whiskey", "gin tonic", "sake", "limonada", "limonata", "lemonade", "zumo", "suc", "juice", "refresco", "soda", "coca cola", "agua mineral", "kombucha", "espresso", "cappuccino", "latte"];
+
+const ROLE_WORDS: Array<[Exclude<DishRoleValue, "set_menu" | "other" | "drink">, readonly string[]]> = [
   ["dessert", ["postre", "dessert", "dolci", "dolc", "tiramisu", "helado", "gelat", "gelato", "ice cream", "sorbet", "flan", "tarta", "pastis", "cake", "cheesecake", "brownie", "mousse", "coulant", "panna cotta", "crema catalana", "churro", "cannoli", "pudding", "brulee", "sweet", "nachspeise", "sobremesa", "dessert"]],
   ["side", ["guarnicion", "guarnicions", "acompanamiento", "acompanyament", "side", "sides", "contorni", "beilage", "fries", "patatas fritas"]],
   ["starter", ["entrante", "entrants", "starter", "appetizer", "appetiser", "aperitivo", "aperitiu", "tapas", "tapes", "para compartir", "per compartir", "antipasti", "antipasto", "picoteo", "ensalada", "amanida", "salad", "sopa", "soup", "croquetas", "croquetes", "bruschetta", "per comencar", "para empezar", "mezze", "vorspeise", "entree francais", "dim sum", "samosa", "edamame", "hummus"]],
@@ -29,6 +32,8 @@ export function dishRole(section: string | undefined, name: string, offering: "a
   if (offering === "set_menu") return "set_menu";
   if (offering === "dessert") return "dessert";
   const bySection = section ? normalizeText(section) : "";
+  if (bySection && hasWord(bySection, DRINK_SECTION_WORDS)) return "drink";
+  if (hasWord(normalizeText(name), DRINK_NAME_WORDS)) return "drink";
   for (const [role, words] of ROLE_WORDS) if (bySection && hasWord(bySection, words)) return role;
   if (course === "starter" || course === "main" || course === "side" || course === "dessert") return course;
   const byName = normalizeText(name);
@@ -36,7 +41,7 @@ export function dishRole(section: string | undefined, name: string, offering: "a
   return "other";
 }
 
-export const ROLE_WEIGHT: Record<DishRoleValue, number> = { main: 1, set_menu: 1, starter: 0.6, other: 0.6, side: 0.4, dessert: 0.25 };
+export const ROLE_WEIGHT: Record<DishRoleValue, number> = { main: 1, set_menu: 1, starter: 0.6, other: 0.6, side: 0.4, dessert: 0.25, drink: 0 };
 
 const LIGHT_MEAL_ROLES: ReadonlySet<DishRoleValue> = new Set<DishRoleValue>(["main", "set_menu", "starter"]);
 const FULL_MEAL_ROLES: ReadonlySet<DishRoleValue> = new Set<DishRoleValue>(["main", "set_menu"]);

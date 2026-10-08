@@ -274,6 +274,78 @@ test.describe("live flow (network mocked)", () => {
   });
 });
 
+/* The tests below use the REAL browser client, REAL /api/recommend handler and REAL orchestrator, resolver, extractor and ranking.
+   Only the external providers (Places, Gemini, the restaurants' websites) are deterministic fakes inside tests/e2e/harness/server.ts. */
+const HARNESS = "http://localhost:3130";
+
+async function useHarness(page: Page, scenario = "default", tag = "none") {
+  await page.route("**/api/recommend", (route) => route.continue({ url: `${HARNESS}/api/recommend`, headers: { ...route.request().headers(), "x-scenario": scenario, "x-tag": tag } }));
+}
+
+const harnessState = async (request: import("@playwright/test").APIRequestContext, tag: string) => (await request.get(`${HARNESS}/__state?tag=${encodeURIComponent(tag)}`)).json() as Promise<{ started: number; completed: number; aborted: number }>;
+
+test.describe("real API and orchestrator (fake providers)", () => {
+  test("a sentence goes through the real pipeline and renders evidence-backed results", async ({ page, request }, info) => {
+    const tag = `pipeline-${info.project.name}`;
+    await useHarness(page, "default", tag);
+    await page.goto("/");
+    await page.getByLabel("What are you hungry for?").fill("vegetarian Italian dinner under €30");
+    await page.getByRole("button", { name: /Find my table/ }).click();
+    await expect(page.getByRole("heading", { name: /Your best matches/ })).toBeVisible();
+    const cards = page.getByTestId("recommendation-card");
+    await expect(cards).toHaveCount(3);
+    await expect(cards.first()).toContainText("Risotto de setas (V)");
+    await expect(cards.first()).toContainText("€14.50");
+    await expect(cards.first()).not.toContainText("Croquetas");
+    await expect(cards.first()).toContainText("Budget");
+    await page.getByTestId("run-summary").locator("summary").click();
+    await expect(page.getByTestId("run-summary")).toContainText("AI requests");
+    await noHorizontalOverflow(page);
+    await page.screenshot({ path: `${SHOT_DIR}/e2e-real-api-${info.project.name}.png`, fullPage: true });
+    await expect.poll(() => harnessState(request, tag)).toMatchObject({ started: 1, completed: 1, aborted: 0 });
+  });
+
+  test("an unsupported city is rejected by the real understanding step", async ({ page }) => {
+    await useHarness(page);
+    await page.goto("/");
+    await page.getByLabel("What are you hungry for?").fill("vegan dinner in Madrid");
+    await page.getByRole("button", { name: /Find my table/ }).click();
+    await expect(page.locator('[data-notice="request_problem"]')).toContainText("Barcelona");
+  });
+
+  test("restaurants without readable menus are explained, not guessed", async ({ page }) => {
+    await useHarness(page, "nomenu");
+    await page.goto("/");
+    await page.getByLabel("What are you hungry for?").fill("vegetarian dinner");
+    await page.getByRole("button", { name: /Find my table/ }).click();
+    await expect(page.getByRole("heading", { name: /Nothing we can recommend/ })).toBeVisible();
+    await page.getByTestId("excluded-list").locator("summary").click();
+    await expect(page.getByTestId("excluded-list")).toContainText("Casa Dos");
+  });
+
+  test("AI quota exhaustion is disclosed and the search still finishes", async ({ page }) => {
+    await useHarness(page, "quota");
+    await page.goto("/");
+    await page.getByLabel("What are you hungry for?").fill("vegetarian dinner");
+    await page.getByRole("button", { name: /Find my table/ }).click();
+    await expect(page.getByTestId("recommendation-results")).toBeVisible();
+    await expect(page.getByTestId("recommendation-results")).toContainText("daily limit");
+  });
+
+  test("cancelling in the browser stops the search on the server", async ({ page, request }, info) => {
+    const tag = `cancel-${info.project.name}`;
+    await useHarness(page, "slow", tag);
+    await page.goto("/");
+    await page.getByLabel("What are you hungry for?").fill("vegetarian dinner");
+    await page.getByRole("button", { name: /Find my table/ }).click();
+    await expect(page.getByRole("button", { name: "Cancel search" })).toBeVisible();
+    await page.getByRole("button", { name: "Cancel search" }).click();
+    await expect(page.getByLabel("What are you hungry for?")).toBeVisible();
+    await expect.poll(async () => (await harnessState(request, tag)).aborted, { timeout: 10_000 }).toBe(1);
+    expect((await harnessState(request, tag)).completed).toBe(0);
+  });
+});
+
 test("design gallery renders every notice and has no critical accessibility violations", async ({ page }, info) => {
   await page.goto("/dev/gallery");
   await expect(page.getByRole("heading", { name: "Forkcast design gallery" })).toBeVisible();

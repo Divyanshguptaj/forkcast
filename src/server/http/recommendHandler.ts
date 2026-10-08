@@ -15,7 +15,7 @@ export interface Providers {
 
 export interface HandlerDeps {
   env(): Env;
-  providers(env: Env): Providers | undefined;
+  providers(env: Env, req: Request): Providers | undefined;
   limiter: RateLimiter;
   run?: typeof runRecommendation;
   modelCache?: RunDeps["modelCache"];
@@ -91,7 +91,7 @@ export function createRecommendHandler(deps: HandlerDeps) {
     } catch {
       return json(503, "not_configured", "Forkcast is not configured on this server.");
     }
-    const providers = deps.providers(env);
+    const providers = deps.providers(env, req);
     if (!providers) return json(503, "not_configured", "Forkcast is not configured on this server.");
 
     const admission = deps.limiter.tryStart(clientKey(req, env.TRUST_PROXY_HEADERS));

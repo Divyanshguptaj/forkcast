@@ -23,7 +23,7 @@ const ModelVerdict = z.object({
   evidence: z.string().max(400).nullish().transform((v) => v ?? ""),
 });
 
-export const ModelDishSchema = z.object({
+const ModelDishObject = z.object({
   originalName: z.string().min(1).max(200),
   translatedName: text(200),
   originalDescription: text(600),
@@ -36,8 +36,27 @@ export const ModelDishSchema = z.object({
   course: z.enum(["starter", "main", "side", "dessert", "other"]).nullish().catch(undefined).transform((v) => v ?? undefined),
   page: z.number().int().min(1).max(500).nullish().transform((v) => v ?? undefined),
   vegetarian: ModelVerdict,
-  vegan: ModelVerdict,
+  vegan: ModelVerdict.optional().transform((v) => v ?? { status: "unknown" as const, basis: "unknown" as const, evidence: "" }),
 });
+
+const WIRE_KEYS: Record<string, string> = { n: "originalName", t: "translatedName", d: "originalDescription", l: "originalLanguage", s: "section", m: "setMenuId", p: "priceRaw", c: "course", g: "page", v: "vegetarian", x: "vegan" };
+const WIRE_VERDICT: Record<string, string> = { s: "status", b: "basis", e: "evidence" };
+
+function expandKeys(value: unknown, map: Record<string, string>): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, v] of Object.entries(value)) out[map[key] ?? key] = v;
+  return out;
+}
+
+function expandDish(raw: unknown): unknown {
+  const dish = expandKeys(raw, WIRE_KEYS) as Record<string, unknown> | unknown;
+  if (typeof dish !== "object" || dish === null) return dish;
+  const record = dish as Record<string, unknown>;
+  return { ...record, vegetarian: expandKeys(record.vegetarian, WIRE_VERDICT), vegan: expandKeys(record.vegan, WIRE_VERDICT) };
+}
+
+export const ModelDishSchema = z.preprocess(expandDish, ModelDishObject);
 
 export const ModelSetMenuSchema = z.object({
   id: z.string().min(1).max(80),
@@ -81,66 +100,70 @@ export type ModelDish = z.infer<typeof ModelDishSchema>;
 export type ModelDocument = z.infer<typeof ModelDocumentSchema>;
 export type ModelExtraction = z.infer<typeof ModelExtractionSchema>;
 
-const str = (nullable = true) => ({ type: "STRING", nullable });
+const str = (description?: string, nullable = true) => ({ type: "STRING", nullable, ...(description ? { description } : {}) });
 const verdictSchema = (withEvidence: boolean) => ({
   type: "OBJECT",
   properties: {
-    status: { type: "STRING", enum: ["confirmed", "possible", "not_suitable", "unknown"] },
-    basis: { type: "STRING", enum: ["menu_label", "ingredients", "name_only", "unknown"] },
-    ...(withEvidence ? { evidence: str() } : {}),
+    s: { type: "STRING", enum: ["confirmed", "possible", "not_suitable", "unknown"], description: "status" },
+    b: { type: "STRING", enum: ["menu_label", "ingredients", "name_only", "unknown"], description: "basis" },
+    ...(withEvidence ? { e: str("verbatim quote supporting a confirmed or not_suitable status") } : {}),
   },
-  required: ["status", "basis"],
+  required: ["s", "b"],
 });
 
-export const EXTRACTION_JSON_SCHEMA = {
-  type: "OBJECT",
-  properties: {
-    documents: {
-      type: "ARRAY",
-      items: {
-        type: "OBJECT",
-        properties: {
-          documentId: str(false),
-          verdict: { type: "STRING", enum: ["food_menu", "set_menu", "dessert_menu", "drinks_only", "legal_or_other", "wrong_restaurant", "unreadable"] },
-          reason: str(),
-          languages: { type: "ARRAY", items: { type: "STRING", enum: ["ca", "es", "en", "other"] } },
-          omittedNonMatchingCount: { type: "INTEGER" },
-          setMenus: {
-            type: "ARRAY",
-            items: { type: "OBJECT", properties: { id: str(false), name: str(false), description: str(), priceRaw: str() }, required: ["id", "name"] },
-          },
-          dishes: {
-            type: "ARRAY",
-            items: {
-              type: "OBJECT",
-              properties: {
-                originalName: str(false),
-                translatedName: str(),
-                originalDescription: str(),
-                originalLanguage: { type: "STRING", enum: ["ca", "es", "en", "other"] },
-                section: str(),
-                setMenuId: str(),
-                priceRaw: str(),
-                page: { type: "INTEGER", nullable: true },
-                vegetarian: verdictSchema(true),
-                course: { type: "STRING", enum: ["starter", "main", "side", "dessert", "other"], nullable: true },
-                vegan: verdictSchema(false),
+export function extractionJsonSchema(opts: { vegan: boolean } = { vegan: true }) {
+  return {
+    type: "OBJECT",
+    properties: {
+      documents: {
+        type: "ARRAY",
+        items: {
+          type: "OBJECT",
+          properties: {
+            documentId: str(undefined, false),
+            verdict: { type: "STRING", enum: ["food_menu", "set_menu", "dessert_menu", "drinks_only", "legal_or_other", "wrong_restaurant", "unreadable"] },
+            reason: str(),
+            languages: { type: "ARRAY", items: { type: "STRING", enum: ["ca", "es", "en", "other"] } },
+            omittedNonMatchingCount: { type: "INTEGER" },
+            setMenus: {
+              type: "ARRAY",
+              items: { type: "OBJECT", properties: { id: str(undefined, false), name: str(undefined, false), description: str(), priceRaw: str() }, required: ["id", "name"] },
+            },
+            dishes: {
+              type: "ARRAY",
+              items: {
+                type: "OBJECT",
+                properties: {
+                  n: str("name exactly as printed", false),
+                  t: str("English translation, null if already English"),
+                  d: str("printed description, only if it lists ingredients"),
+                  l: { type: "STRING", enum: ["ca", "es", "en", "other"], description: "language of the name" },
+                  s: str("menu section heading"),
+                  m: str("set menu id this dish belongs to"),
+                  p: str("price exactly as printed beside the dish"),
+                  c: { type: "STRING", enum: ["starter", "main", "side", "dessert", "other"], nullable: true, description: "course" },
+                  g: { type: "INTEGER", nullable: true, description: "page number" },
+                  v: verdictSchema(true),
+                  ...(opts.vegan ? { x: verdictSchema(false) } : {}),
+                },
+                required: ["n", "t", "l", "s", "p", "v", ...(opts.vegan ? ["x"] : [])],
               },
-              required: ["originalName", "translatedName", "originalLanguage", "section", "priceRaw", "vegetarian", "vegan"],
             },
           },
+          required: ["documentId", "verdict", "omittedNonMatchingCount", "dishes"],
         },
-        required: ["documentId", "verdict", "omittedNonMatchingCount", "dishes"],
       },
     },
-  },
-  required: ["documents"],
-} as const;
+    required: ["documents"],
+  };
+}
+
+export const EXTRACTION_JSON_SCHEMA = extractionJsonSchema({ vegan: true });
 
 export const PRICE_CHECK_JSON_SCHEMA = {
   type: "OBJECT",
   properties: {
-    lines: { type: "ARRAY", items: { type: "OBJECT", properties: { dish: str(false), price: str() }, required: ["dish"] } },
+    lines: { type: "ARRAY", items: { type: "OBJECT", properties: { dish: str(undefined, false), price: str() }, required: ["dish"] } },
   },
   required: ["lines"],
 } as const;

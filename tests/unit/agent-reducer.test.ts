@@ -62,7 +62,7 @@ describe("Phase 2 events", () => {
   it("create five shortlisted restaurants with the facts Phase 2 provides", () => {
     expect(state.shortlistOrder).toHaveLength(5);
     const first = state.restaurants[state.shortlistOrder[0]];
-    expect(first).toMatchObject({ name: "Osteria Alba", rating: 4.7, ratingCount: 3120, priceLevel: 2, distanceKm: 0.52 });
+    expect(first).toMatchObject({ name: "Osteria Alba", rating: 4.7, ratingCount: 3120, priceLevel: 2, distanceKm: 0.5 });
     expect(first.menu.items).toEqual([]);
     expect(first.reviews).toBeUndefined();
   });

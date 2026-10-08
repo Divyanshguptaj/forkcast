@@ -6,7 +6,7 @@ import { PriceTag } from "./PriceTag";
 
 const DIET_NAME: Record<string, string> = { vegetarian: "vegetarian", vegan: "vegan", pescatarian: "pescatarian", gluten_free: "gluten-free", halal: "halal", kosher: "kosher" };
 
-const ROLE_LABEL: Record<MatchedDish["role"], string> = { main: "Main", starter: "Starter", side: "Side", dessert: "Dessert", set_menu: "Set menu", other: "Dish" };
+const ROLE_LABEL: Record<MatchedDish["role"], string> = { main: "Main", starter: "Starter", side: "Side", dessert: "Dessert", drink: "Drink", set_menu: "Set menu", other: "Dish" };
 
 const FIT: Record<MatchedDish["fit"], { label: string; tone: BadgeTone; icon: string; hint: string }> = {
   exact: { label: "Matches", tone: "basil", icon: "✓", hint: "Every requirement is confirmed by the menu for this dish." },
@@ -20,6 +20,14 @@ function dietBadge(d: MatchedDish["diet"][number]) {
   if (d.status === "possible") return { label: `Likely ${name}`, tone: "basil" as const, icon: "🌱", dashed: true, hint: "Guessed from the dish name. The menu doesn't say." };
   if (d.status === "not_suitable") return { label: `Not ${name}`, tone: "chili" as const, icon: "✕", dashed: false, hint: "The menu names an ingredient that rules it out." };
   return { label: `${name.charAt(0).toUpperCase()}${name.slice(1)}: unclear`, tone: "neutral" as const, icon: "?", dashed: false, hint: "The menu gives no information." };
+}
+
+const squash = (v: string) => v.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+function evidenceAddsInfo(evidence: string, name: string): boolean {
+  const e = squash(evidence);
+  const n = squash(name);
+  return e.length > 0 && e !== n && !n.includes(e);
 }
 
 export function MatchedDishRow({ dish }: { dish: MatchedDish }) {
@@ -70,7 +78,7 @@ export function MatchedDishRow({ dish }: { dish: MatchedDish }) {
       </div>
       {budgetNote ? <p className="text-xs text-muted">Budget: {budgetNote}</p> : null}
       {dish.outcomes.some((o) => o.kind === "allergy") ? <p className="text-xs font-semibold text-saffron">Allergens not verified for this dish. Ask the restaurant.</p> : null}
-      {dish.source.evidence ? <p className="text-xs italic text-muted [overflow-wrap:anywhere]">“{dish.source.evidence}”</p> : null}
+      {dish.source.evidence && evidenceAddsInfo(dish.source.evidence, dish.name) ? <p className="text-xs italic text-muted [overflow-wrap:anywhere]">“{dish.source.evidence}”</p> : null}
       <p className="text-xs text-muted">
         <a href={dish.source.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline decoration-line underline-offset-4 hover:text-ink">
           Menu{dish.source.page ? `, page ${dish.source.page}` : ""} <ExternalLink aria-hidden="true" className="size-3" />

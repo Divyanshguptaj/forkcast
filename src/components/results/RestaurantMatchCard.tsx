@@ -133,7 +133,7 @@ export function RestaurantMatchCard({ r, headingLevel = 3 }: { r: MatchedRestaur
           <DishList label="Fit your diet but are over budget" dishes={near} />
           {r.exactDishCount + r.possibleDishCount > r.dishes.length ? (
             <p className="text-xs text-muted">
-              Showing {r.dishes.length} of {r.exactDishCount + r.possibleDishCount} possible dishes from {r.menuDishCount} read from the menu.
+              Showing {r.dishes.length} of {r.exactDishCount + r.possibleDishCount} candidate dishes ({r.menuDishCount} dishes read in total).
             </p>
           ) : null}
         </Section>

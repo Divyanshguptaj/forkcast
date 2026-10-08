@@ -29,6 +29,7 @@ export interface RecommendInput {
   cuisines?: string[];
   candidates: RecommendCandidate[];
   limits?: Partial<RecommendLimits>;
+  currentYear?: number;
 }
 
 const TIER_ORDER: Record<RecommendationTierValue, number> = { exact: 0, partial: 1, uncertain: 2, near_miss: 3 };
@@ -206,7 +207,7 @@ export function recommend(input: RecommendInput): RecommendationSet {
   const discovery = new Map(input.candidates.map((c) => [c.restaurant.placeId, c.shortlistScore]));
 
   for (const cand of input.candidates) {
-    const out = evaluateRestaurant(cand, constraints);
+    const out = evaluateRestaurant(cand, constraints, input.currentYear);
     if ("tier" in out) evaluated.push(out);
     else excluded.push({ restaurantId: cand.restaurant.placeId, name: cand.restaurant.name, code: out.code, reason: out.reason });
   }

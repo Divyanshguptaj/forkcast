@@ -33,8 +33,16 @@ function isTrackingParam(name: string): boolean {
   return lower.startsWith("utm_") || TRACKING_PARAMS.has(lower);
 }
 
+const PRIVATE_SUFFIXES = [
+  "dish.co", "wixsite.com", "wix.com", "wordpress.com", "blogspot.com", "squarespace.com", "weebly.com", "godaddysites.com", "business.site", "webflow.io",
+  "netlify.app", "vercel.app", "github.io", "herokuapp.com", "carrd.co", "jimdosite.com", "jimdofree.com", "site123.me", "webnode.es", "myshopify.com", "web.app", "firebaseapp.com", "pages.dev",
+];
+
 export function registrableDomain(host: string): string {
-  const labels = host.toLowerCase().replace(/\.$/, "").split(".");
+  const labels = host.toLowerCase().replace(/\.$/, "").replace(/^www\./, "").split(".");
+  const joined = labels.join(".");
+  const platform = PRIVATE_SUFFIXES.find((suffix) => joined.endsWith(`.${suffix}`));
+  if (platform) return labels.slice(-(platform.split(".").length + 1)).join(".");
   if (labels.length <= 2) return labels.join(".");
   const lastTwo = labels.slice(-2).join(".");
   if (TWO_LEVEL_SUFFIXES.has(lastTwo)) return labels.slice(-3).join(".");

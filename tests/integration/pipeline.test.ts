@@ -243,6 +243,22 @@ describe("provider failures", () => {
   });
 });
 
+describe("a provider that never answers", () => {
+  it("is cut off at the hard deadline and the other results are still delivered", async () => {
+    const stuck = routes();
+    const never = { async fetch(url: string) { if (url.includes("dos.example")) return new Promise(() => undefined); return fakeFetcher(stuck).fetch(url); } };
+    const h = harness({ fetcher: never as never, limits: { softDeadlineMs: 60, hardDeadlineMs: 400 } });
+    const started = Date.now();
+    const out = await runRecommendation(body("vegetarian dinner"), h.deps);
+    expect(Date.now() - started).toBeLessThan(3_000);
+    expect(out.outcome).toBe("completed");
+    expect(out.metrics?.partial).toBe(true);
+    const set = result(h.events)!;
+    expect(set.notices.join(" ")).toContain("time limit");
+    expect(set.excluded.some((e) => e.name === "Casa Dos")).toBe(true);
+  });
+});
+
 describe("cancellation", () => {
   it("stops all work and emits no results when the client disconnects mid-run", async () => {
     const llm = llmFor();
@@ -267,6 +283,28 @@ describe("cancellation", () => {
     expect(["cancelled", "failed"]).toContain(out.outcome);
     expect(p.calls.length).toBeLessThanOrEqual(2);
     expect(types(h.events)).not.toContain("recommendations.ready");
+  });
+});
+
+describe("research concurrency", () => {
+  const five = ["a", "b", "c", "d", "e"].map((x) => ({ id: `r${x}`, name: `Casa ${x.toUpperCase()}`, host: `${x}.example` }));
+
+  async function wallMs(restaurantConcurrency: number) {
+    const table = routes(five);
+    for (const s of five) table[`https://${s.host}/`] = { body: html(nav([["Carta", "/carta.pdf"]])), delayMs: 400 } as unknown as string;
+    const h = harness({ places: places(five), fetcher: fakeFetcher(table as never), limits: { restaurantConcurrency } });
+    const started = Date.now();
+    await runRecommendation(body("vegetarian dinner"), h.deps);
+    const starts = h.events.filter((e) => e.type === "restaurant.step" && "step" in e && e.step === "menu" && e.status === "started").length;
+    return { ms: Date.now() - started, starts, count: result(h.events)?.recommendations.length };
+  }
+
+  it("starts every shortlisted restaurant at once, so the slowest one is not queued behind others", async () => {
+    const queued = await wallMs(3);
+    const parallel = await wallMs(5);
+    expect(parallel.starts).toBe(5);
+    expect(parallel.count).toBeGreaterThan(0);
+    expect(parallel.ms).toBeLessThan(queued.ms - 250);
   });
 });
 

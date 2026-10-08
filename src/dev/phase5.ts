@@ -87,7 +87,7 @@ async function main(): Promise<void> {
   const t1 = Date.now();
   const { results, stats } = await extractMenus(
     restaurants.map((restaurant, i) => ({ restaurant, resolution: resolutions[i] })),
-    { fetcher: defaultFetcher, sharedCache, llm, priceCheckModel: env.GEMINI_PRICE_CHECK_MODEL, emitter, focus: flags.get("focus") === "all" ? "all" : "plant_based", verifyImagePrices: !bools.has("no-price-check") },
+    { fetcher: defaultFetcher, sharedCache, llm, priceCheckModel: env.GEMINI_PRICE_CHECK_MODEL, emitter, focus: flags.get("focus") === "all" ? "all" : "plant_based", verifyImagePrices: !bools.has("no-price-check"), requestedDiets: flags.get("diet")?.split(",") },
   );
   const tExtract = Date.now() - t1;
 

@@ -108,6 +108,27 @@ describe("dish roles", () => {
   });
 });
 
+describe("drinks are never recommended as dishes", () => {
+  it("removes cocktails, wines and lemonades that leak out of a mixed menu", () => {
+    const menu = extraction("r1", [
+      dish({ name: "Aperol Spritz Went to Asia", veg: "confirmed", vegan: "confirmed", price: 6.5 }),
+      dish({ name: "Limonata di fragole", veg: "confirmed", vegan: "confirmed", price: 4 }),
+      dish({ name: "Chardonnay", section: "Vinos blancos", veg: "confirmed", vegan: "confirmed", price: 5 }),
+      dish({ name: "Pasta al pomodoro", veg: "confirmed", vegan: "confirmed", price: 11 }),
+      dish({ name: "Tarta de café", veg: "confirmed", price: 5, section: "Postres" }),
+    ]);
+    const r = recommend({ request: request({ diet: ["vegan"], meal: "any" }), candidates: [candidate("r1", menu)] }).recommendations[0];
+    expect(r.dishes.map((d) => d.name)).toEqual(["Pasta al pomodoro"]);
+    expect(r.exactDishCount).toBe(1);
+  });
+
+  it("does not mistake a pizza named Margherita or a coffee dessert for a drink", () => {
+    const menu = extraction("r1", [dish({ name: "Margherita", veg: "confirmed", price: 9, section: "Pizzas" }), dish({ name: "Cheesecake de café", veg: "confirmed", price: 5 })]);
+    const r = recommend({ request: request({ diet: ["vegetarian"], meal: "any" }), candidates: [candidate("r1", menu)] }).recommendations[0];
+    expect(r.dishes.map((d) => d.name).sort()).toEqual(["Cheesecake de café", "Margherita"]);
+  });
+});
+
 describe("set menus and group menus", () => {
   it("does not copy a set-menu price onto individual dishes of a set-menu document", () => {
     const out = build([modelDish("Paella de verduras", { priceRaw: "24 €" })], "set_menu");
@@ -134,5 +155,23 @@ describe("set menus and group menus", () => {
     expect(r.dishes[0].price.amount).toBeUndefined();
     expect(r.dishes[0].price.groupMenu).toEqual({ name: "Menú de grupos", amount: 36 });
     expect(r.reasons.map((x) => x.text).join(" ")).not.toContain("€36");
+  });
+});
+
+describe("outdated menus", () => {
+  it("warns when the only menu file is dated before the current year", () => {
+    const menu = extraction("r1", [dish({ name: "Risotto de verduras", veg: "confirmed", price: 12 })]);
+    menu.documents[0].url = "https://r1.example/wp-content/uploads/2024/02/Menu-2024.pdf";
+    const r = recommend({ request: request({ diet: ["vegetarian"] }), candidates: [candidate("r1", menu)], currentYear: 2026 }).recommendations[0];
+    expect(r.uncertainties.join(" ")).toContain("dates from 2024");
+    const fresh = recommend({ request: request({ diet: ["vegetarian"] }), candidates: [candidate("r1", menu)], currentYear: 2024 }).recommendations[0];
+    expect(fresh.uncertainties.join(" ")).not.toContain("dates from");
+  });
+
+  it("prefers the newest dated menu file and drops older copies of the same menu", async () => {
+    const { dropOutdatedDocuments } = await import("@/server/menu/extract/pipeline");
+    const c = (url: string, kind = "food_menu") => ({ id: url, url, documentKind: kind }) as never;
+    const kept = dropOutdatedDocuments([c("https://x.example/Menu-2025.pdf"), c("https://x.example/2026/Menu.pdf"), c("https://x.example/carta.pdf"), c("https://x.example/Postres-2023.pdf", "dessert_menu")]) as Array<{ url: string }>;
+    expect(kept.map((d) => d.url)).toEqual(["https://x.example/2026/Menu.pdf", "https://x.example/carta.pdf", "https://x.example/Postres-2023.pdf"]);
   });
 });

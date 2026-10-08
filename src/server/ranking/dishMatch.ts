@@ -123,6 +123,10 @@ export function evaluateDish(dish: ExtractedDish, setMenus: Map<string, SetMenu>
     }
   }
 
+  if (role === "drink") {
+    return { dish, role, outcomes: [], fit: "excluded", price, dietStrength: 0 };
+  }
+
   const unmet = outcomes.filter((o) => o.verdict === "unmet");
   const dietConfirmed = outcomes.filter((o) => o.kind === "diet").every((o) => o.verdict === "met");
   let fit: InternalFit;

@@ -10,6 +10,14 @@ import { httpsVariant, normalizeUrl, registrableDomain, resolveUrl, sameSite } f
 import { samplePdf } from "@/server/menu/resolver/pdfProbe";
 import { FOOD_LINES, html, makeTextPdf, scannedPdf } from "../helpers/resolverKit";
 
+describe("shared hosting platforms", () => {
+  it("never treat two customers of the same platform, or its CDN, as the same site", () => {
+    expect(sameSite("https://abanic.dish.co/", "https://cdn.website.dish.co/media/x/menu.pdf")).toBe(false);
+    expect(sameSite("https://uno.wixsite.com/a", "https://dos.wixsite.com/b")).toBe(false);
+    expect(sameSite("https://abanic.dish.co/carta", "https://www.abanic.dish.co/menu.pdf")).toBe(true);
+  });
+});
+
 describe("URL normalization", () => {
   it("removes fragments, tracking params, default ports and trailing slashes but keeps the original", () => {
     const n = normalizeUrl("https://WWW.Example.com:443/Carta/?utm_source=google&b=2&a=1&fbclid=x&tracking=mybusiness#top")!;
@@ -31,6 +39,10 @@ describe("URL normalization", () => {
   it("computes registrable domains including two-level suffixes", () => {
     expect(registrableDomain("online.fliphtml5.com")).toBe("fliphtml5.com");
     expect(registrableDomain("www.restaurante.com.es")).toBe("restaurante.com.es");
+    expect(registrableDomain("abanic.dish.co")).toBe("abanic.dish.co");
+    expect(registrableDomain("cdn.website.dish.co")).toBe("website.dish.co");
+    expect(registrableDomain("mi-casa.wixsite.com")).toBe("mi-casa.wixsite.com");
+    expect(registrableDomain("www.dish.co")).toBe("dish.co");
     expect(sameSite("https://www.vegan-tulsi.com/menus", "https://vegan-tulsi.com")).toBe(true);
     expect(sameSite("https://vegantulsi.com", "https://vegan-tulsi.com")).toBe(false);
   });
@@ -197,7 +209,7 @@ describe("identity matching", () => {
   });
 
   it("derives name and street tokens sensibly", () => {
-    expect(nameTokens("Elio's - Restaurant italianà a Barcelona i Bar de Còctels")).toEqual(["ana"]);
+    expect(nameTokens("Elio's - Restaurant italianà a Barcelona i Bar de Còctels")).toEqual(["elio"]);
     expect(nameTokens("Viento | Restaurante Italiano Barcelona")).toEqual(["viento"]);
     expect(streetTokens("Carrer dels Àngels, 8, Ciutat Vella")).toEqual(["angels"]);
   });

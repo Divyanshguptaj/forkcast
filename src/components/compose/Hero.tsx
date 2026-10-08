@@ -18,7 +18,7 @@ export function Hero() {
           <span aria-hidden="true">📖 </span>Read menus
         </li>
         <li>
-          <span aria-hidden="true">💬 </span>Check reviews
+          <span aria-hidden="true">🥗 </span>Match your diet
         </li>
         <li>
           <span aria-hidden="true">🏆 </span>Rank

@@ -1,3 +1,4 @@
+import { menuYear } from "@/lib/menuYear";
 import { normalizeText } from "@/lib/text";
 import type { DishDiet, ExtractedDish, ExtractedDocument, ExtractionUsage, MenuExtraction, SetMenu } from "@/schemas/menuExtraction";
 import type { MenuItemPreview } from "@/schemas/menu";
@@ -17,7 +18,7 @@ import { deterministicDocument } from "./deterministic";
 import { DEFAULT_EXTRACT_LIMITS, type ExtractLimits } from "./limits";
 import { loadDocument, type LoadedDocument } from "./loader";
 import { ExtractionCache, contentKey } from "./modelCache";
-import { EXTRACTION_JSON_SCHEMA, ModelExtractionSchema, PRICE_CHECK_JSON_SCHEMA, PriceCheckSchema, mergeModelDocuments, type ModelDocument } from "./modelSchema";
+import { ModelExtractionSchema, extractionJsonSchema, PRICE_CHECK_JSON_SCHEMA, PriceCheckSchema, mergeModelDocuments, type ModelDocument } from "./modelSchema";
 import { parsePriceText } from "./price";
 import { PRICE_CHECK_SYSTEM, buildPriceCheckParts, buildSystemPrompt, buildTextParts, buildVisionParts, type ExtractionFocus, type PromptDocument } from "./prompts";
 import { buildFromModel, type SourceDoc } from "./validate";
@@ -38,6 +39,7 @@ export interface ExtractDeps {
   limits?: Partial<ExtractLimits>;
   focus?: ExtractionFocus;
   verifyImagePrices?: boolean;
+  requestedDiets?: readonly string[];
   now?: () => number;
 }
 
@@ -127,8 +129,14 @@ export function previewDishes(dishes: ExtractedDish[], diet: keyof DishDiet = "v
 
 const KIND_PRIORITY: Record<string, number> = { food_menu: 0, set_menu_or_groups: 1, dessert_menu: 2 };
 
+export function dropOutdatedDocuments(selected: CandidateSummary[]): CandidateSummary[] {
+  const newest = Math.max(0, ...selected.filter((c) => c.documentKind === "food_menu").map((c) => menuYear(c.url) ?? 0));
+  if (newest === 0) return selected;
+  return selected.filter((c) => c.documentKind !== "food_menu" || (menuYear(c.url) ?? newest) >= newest);
+}
+
 export function chooseDocuments(selected: CandidateSummary[], max: number): CandidateSummary[] {
-  return [...selected].sort((a, b) => (KIND_PRIORITY[a.documentKind] ?? 3) - (KIND_PRIORITY[b.documentKind] ?? 3) || b.confidence - a.confidence).slice(0, max);
+  return [...dropOutdatedDocuments(selected)].sort((a, b) => (KIND_PRIORITY[a.documentKind] ?? 3) - (KIND_PRIORITY[b.documentKind] ?? 3) || b.confidence - a.confidence).slice(0, max);
 }
 
 export function selectDocuments(inputs: ExtractInput[], limits: Pick<ExtractLimits, "maxDocsPerRestaurant" | "maxDocsTotal"> & { includeSecondaryMenus?: boolean }): Map<ExtractInput, CandidateSummary[]> {
@@ -317,7 +325,9 @@ export async function extractMenus(inputs: ExtractInput[], deps: ExtractDeps): P
     }
   };
 
-  const system = buildSystemPrompt(focus);
+  const withVegan = deps.requestedDiets?.includes("vegan") ?? true;
+  const system = buildSystemPrompt(focus, { vegan: withVegan });
+  const jsonSchema = extractionJsonSchema({ vegan: withVegan }) as unknown as Record<string, unknown>;
 
   const callModel = async <T>(label: string, run: () => Promise<LlmStructuredResult<T>>): Promise<LlmStructuredResult<T>> => {
     const out = await llmLimiter.run(async () => {
@@ -418,7 +428,7 @@ export async function extractMenus(inputs: ExtractInput[], deps: ExtractDeps): P
       system,
       parts: buildTextParts(docs),
       schema: ModelExtractionSchema,
-      jsonSchema: EXTRACTION_JSON_SCHEMA as unknown as Record<string, unknown>,
+      jsonSchema,
       timeoutMs: limits.llmTimeoutMs,
       maxOutputTokens: limits.maxOutputTokens,
     });
@@ -426,7 +436,7 @@ export async function extractMenus(inputs: ExtractInput[], deps: ExtractDeps): P
     startSteps(job.works, job.part ? `Reading menu text (part ${job.part.index} of ${job.part.count})` : "Reading menu text", false);
     try {
       if (single) {
-        const key = contentKey(focus, w0.input.restaurant.name, w0.input.restaurant.address ?? "", w0.candidate.documentKind, job.texts[0]);
+        const key = contentKey(focus, String(withVegan), w0.input.restaurant.name, w0.input.restaurant.address ?? "", w0.candidate.documentKind, job.texts[0]);
         const { doc, hit } = await modelCache.getOrRun(key, async () => {
           committedInputTokens += estimated;
           stats.llmRequests++;
@@ -484,7 +494,7 @@ export async function extractMenus(inputs: ExtractInput[], deps: ExtractDeps): P
     }
     startSteps([w], loaded.mimeType === "application/pdf" ? "Reading a scanned menu" : "Reading an image menu", true);
     try {
-      const key = contentKey(focus, w.input.restaurant.name, w.input.restaurant.address ?? "", w.candidate.documentKind, loaded.data);
+      const key = contentKey(focus, String(withVegan), w.input.restaurant.name, w.input.restaurant.address ?? "", w.candidate.documentKind, loaded.data);
       const { doc, hit } = await modelCache.getOrRun(key, async () => {
         committedInputTokens += VISION_INPUT_TOKENS;
         stats.llmRequests++;
@@ -493,7 +503,7 @@ export async function extractMenus(inputs: ExtractInput[], deps: ExtractDeps): P
         usageFor(id).visionRequests++;
         const out = await callModel("menu-extract-vision", () =>
           deps.llm!.generateStructured(
-            { label: "menu-extract-vision", system, parts: buildVisionParts(promptDoc(w), loaded.mimeType, loaded.data), schema: ModelExtractionSchema, jsonSchema: EXTRACTION_JSON_SCHEMA as unknown as Record<string, unknown>, timeoutMs: limits.llmTimeoutMs, maxOutputTokens: limits.maxOutputTokens },
+            { label: "menu-extract-vision", system, parts: buildVisionParts(promptDoc(w), loaded.mimeType, loaded.data), schema: ModelExtractionSchema, jsonSchema, timeoutMs: limits.llmTimeoutMs, maxOutputTokens: limits.maxOutputTokens },
             { signal: deps.signal },
           ),
         );

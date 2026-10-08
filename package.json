@@ -14,7 +14,9 @@
     "phase2": "node --env-file=.env.local --import tsx src/dev/phase2.ts",
     "phase4": "node --env-file=.env.local --import tsx src/dev/phase4.ts",
     "phase5": "node --env-file=.env.local --import tsx src/dev/phase5.ts",
-    "phase6": "node --env-file=.env.local --import tsx src/dev/phase6.ts"
+    "phase6": "node --env-file=.env.local --import tsx src/dev/phase6.ts",
+    "bench": "node --env-file=.env.local --import tsx src/dev/bench.ts",
+    "audit": "node --env-file=.env.local --import tsx src/dev/audit.ts"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

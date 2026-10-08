@@ -12,15 +12,15 @@ export interface ReplayScenario {
   steps: ReplayStep[];
 }
 
-/* DEV / DEMO DATA. Restaurant names, ratings and counts mirror the Phase 2 Barcelona smoke test
-   (recorded 2026-10-07). Everything after `shortlist.done` in "full-demo" is simulated. */
+/* DEV / DEMO DATA. Restaurant names, ratings and counts are synthetic
+   (synthetic data). Everything after `shortlist.done` in "full-demo" is simulated. */
 
 const SHORTLIST = [
-  { id: "demo-alba", name: "Osteria Alba", rating: 4.7, ratingCount: 3120, priceLevel: 2, distanceKm: 0.52, primaryType: "italian_restaurant" },
-  { id: "demo-marina", name: "Trattoria Marina", rating: 4.6, ratingCount: 2140, priceLevel: 2, distanceKm: 1.07, primaryType: "italian_restaurant" },
-  { id: "demo-viento", name: "Viento | Restaurante Italiano Barcelona", rating: 4.6, ratingCount: 1190, priceLevel: 2, distanceKm: 0.5, primaryType: "italian_restaurant" },
-  { id: "demo-elio", name: "Elio's - Restaurant italianà a Barcelona i Bar de Còctels", rating: 4.8, ratingCount: 410, priceLevel: 2, distanceKm: 0.4, primaryType: "italian_restaurant" },
-  { id: "demo-atelier", name: "Pasta Atelier", rating: 4.7, ratingCount: 980, priceLevel: 2, distanceKm: 0.97, primaryType: "italian_restaurant" },
+  { id: "demo-alba", name: "Osteria Alba", rating: 4.7, ratingCount: 3120, priceLevel: 2, distanceKm: 0.5, primaryType: "italian_restaurant" },
+  { id: "demo-marina", name: "Trattoria Marina", rating: 4.6, ratingCount: 2140, priceLevel: 2, distanceKm: 1.1, primaryType: "italian_restaurant" },
+  { id: "demo-viento", name: "Viento | Restaurante Italiano Barcelona", rating: 4.5, ratingCount: 1190, priceLevel: 2, distanceKm: 0.6, primaryType: "italian_restaurant" },
+  { id: "demo-elio", name: "Elio's - Restaurant italianà a Barcelona i Bar de Còctels", rating: 4.3, ratingCount: 410, priceLevel: 2, distanceKm: 0.4, primaryType: "italian_restaurant" },
+  { id: "demo-atelier", name: "Pasta Atelier", rating: 4.4, ratingCount: 980, priceLevel: 2, distanceKm: 1, primaryType: "italian_restaurant" },
 ] as const;
 
 const REQUEST = {

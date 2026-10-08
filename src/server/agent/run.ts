@@ -19,6 +19,7 @@ import { describeFailure } from "./failure";
 
 export interface RunLimits {
   softDeadlineMs: number;
+  hardDeadlineMs: number;
   restaurantConcurrency: number;
   fetchConcurrency: number;
   tavilyConcurrency: number;
@@ -26,7 +27,8 @@ export interface RunLimits {
 
 export const DEFAULT_RUN_LIMITS: RunLimits = {
   softDeadlineMs: Math.round(RUN_LIMITS.globalDeadlineMs * 0.8),
-  restaurantConcurrency: 3,
+  hardDeadlineMs: RUN_LIMITS.globalDeadlineMs,
+  restaurantConcurrency: 5,
   fetchConcurrency: 6,
   tavilyConcurrency: 2,
 };
@@ -50,6 +52,7 @@ export interface RunMetrics {
   phases: { understandAndDiscoverMs: number; researchMs: number; rankMs: number };
   placesCalls: number;
   tavily: { searches: number; extracts: number; credits: number };
+  fetch: { requests: number; bytes: number };
   gemini: { understandRequests: number; extractionRequests: number; visionRequests: number; priceChecks: number; httpRequests: number; inputTokens: number; outputTokens: number; cacheHits: number; quotaSkipped: number; failures: number };
   restaurants: { shortlisted: number; withMenu: number };
   partial: boolean;
@@ -132,7 +135,14 @@ export async function runRecommendation(body: RecommendRequestBodyType, deps: Ru
     const extractions = new Map<string, MenuExtraction>();
     const extractStats: ExtractionRunStats[] = [];
 
-    await Promise.all(
+    let hardTimer: ReturnType<typeof setTimeout> | undefined;
+    const hardStop = new Promise<void>((resolve) => {
+      hardTimer = setTimeout(() => {
+        work.abort();
+        resolve();
+      }, Math.max(0, limits.hardDeadlineMs - (now() - started)));
+    });
+    const research = Promise.all(
       restaurants.map(async (r) => {
         try {
           const resolution = await restaurantLimiter.run(() => resolveMenu(r, { fetcher: deps.fetcher, search: deps.search, emitter: tracked, sharedCache, limiters, signal: work.signal }));
@@ -146,6 +156,7 @@ export async function runRecommendation(body: RecommendRequestBodyType, deps: Ru
             emitter: tracked,
             signal: work.signal,
             focus,
+            requestedDiets: request.diet,
             limits: { maxDocsTotal: 2, maxLlmRequests: 4 },
           });
           extractStats.push(stats);
@@ -155,6 +166,8 @@ export async function runRecommendation(body: RecommendRequestBodyType, deps: Ru
         }
       }),
     );
+    await Promise.race([research, hardStop]);
+    clearTimeout(hardTimer);
     clearTimeout(soft);
     if (cancelled()) return { outcome: "cancelled" };
     const researchedAt = now();
@@ -199,6 +212,7 @@ export async function runRecommendation(body: RecommendRequestBodyType, deps: Ru
       phases: { understandAndDiscoverMs: discoveredAt - started, researchMs: researchedAt - discoveredAt, rankMs: finishedAt - researchedAt },
       placesCalls,
       tavily: { searches: tavilySearches, extracts: tavilyExtracts, credits: tavilyCredits },
+      fetch: { requests: [...resolutions.values()].reduce((n, r) => n + r.usage.directFetches, 0), bytes: [...resolutions.values()].reduce((n, r) => n + r.usage.bytesFetched, 0) },
       gemini,
       restaurants: { shortlisted: restaurants.length, withMenu: set.stats.withMenu },
       partial,

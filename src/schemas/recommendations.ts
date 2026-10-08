@@ -27,7 +27,7 @@ export const ConstraintOutcomeSchema = z.object({
 });
 
 export const DishFit = z.enum(["exact", "possible", "near_miss"]);
-export const DishRole = z.enum(["main", "starter", "side", "dessert", "set_menu", "other"]);
+export const DishRole = z.enum(["main", "starter", "side", "dessert", "drink", "set_menu", "other"]);
 
 export const MatchedDishPriceSchema = z.object({
   amount: z.number().min(0.01).max(1000).optional(),

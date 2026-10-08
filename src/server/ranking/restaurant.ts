@@ -1,3 +1,4 @@
+import { menuYear } from "@/lib/menuYear";
 import { normalizeText } from "@/lib/text";
 import type { ExtractedDish, MenuExtraction, SetMenu } from "@/schemas/menuExtraction";
 import type { Constraint, ConstraintOutcome, ExclusionCodeValue, RecommendationTierValue } from "@/schemas/recommendations";
@@ -97,7 +98,7 @@ function excludedFor(cand: RecommendCandidate, code: ExclusionCodeValue, reason:
   return { candidate: cand, code, reason: reason.slice(0, 300) };
 }
 
-export function evaluateRestaurant(cand: RecommendCandidate, constraints: Constraint[]): Evaluated | Excluded {
+export function evaluateRestaurant(cand: RecommendCandidate, constraints: Constraint[], currentYear = new Date().getFullYear()): Evaluated | Excluded {
   const ext = cand.extraction;
   if (!ext) return excludedFor(cand, "no_menu", "No menu was found for this restaurant, so nothing could be checked against your requirements.");
   if (ext.status === "failed") return excludedFor(cand, "menu_unreadable", `The menu could not be read${ext.reason ? ` (${ext.reason})` : ""}.`);
@@ -207,6 +208,8 @@ export function evaluateRestaurant(cand: RecommendCandidate, constraints: Constr
   if (dietUnconfirmed > 0) uncertainties.push(`${plural(dietUnconfirmed, "more dish", "more dishes")} look ${dietNames}, but the menu doesn't confirm it.`);
   if (priceUnconfirmed > 0 && constraints.some((c) => c.kind === "budget")) uncertainties.push(`${plural(priceUnconfirmed, `${dietNames} dish`, `${dietNames} dishes`)} ${priceUnconfirmed === 1 ? "has" : "have"} no verified price within budget.`);
   if (ext.status === "partial") uncertainties.push("Only part of this menu could be read.");
+  const years = ext.documents.filter((d) => d.status === "extracted" || d.status === "partial").map((d) => menuYear(d.url)).filter((y): y is number => y !== undefined);
+  if (years.length > 0 && Math.max(...years) < currentYear) uncertainties.push(`The menu file looks like it dates from ${Math.max(...years)}, so dishes and prices may have changed.`);
 
   return { candidate: cand, extraction: ext, evals, exact, exactAll, possible, nearMiss, outcomes, tier, unmet, uncertainties: [...new Set(uncertainties)] };
 }

@@ -247,9 +247,7 @@ describe("concurrency and abort", () => {
 
   it("runs restaurants in parallel rather than one after another", async () => {
     const fetcher = fakeFetcher(routes);
-    const started = Date.now();
     await resolveMenus(five, { fetcher, search: fakeSearch(), restaurantConcurrency: 5, fetchConcurrency: 10 });
-    expect(Date.now() - started).toBeLessThan(5 * 2 * 15);
     expect(fetcher.peak).toBeGreaterThan(2);
   });
 

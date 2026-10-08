@@ -37,7 +37,7 @@ describe("shortlist rendering", () => {
     expect(rows).toHaveLength(5);
     const first = rows[0];
     expect(within(first).getByText("Osteria Alba")).toBeInTheDocument();
-    expect(within(first).getByText(/4\.8 \(3,120 reviews\)/)).toBeInTheDocument();
+    expect(within(first).getByText(/4\.7 \(3,120 reviews\)/)).toBeInTheDocument();
     expect(within(first).getByText("€€")).toBeInTheDocument();
     expect(within(first).getByText(/0\.5 km from the center/)).toBeInTheDocument();
     expect(within(first).getByText("Italian restaurant")).toBeInTheDocument();
